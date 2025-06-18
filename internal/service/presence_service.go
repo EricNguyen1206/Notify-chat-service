@@ -2,7 +2,9 @@ package service
 
 import (
 	"chat-service/configs/utils/ws"
+	"chat-service/internal/models"
 	"chat-service/internal/repository"
+	"context"
 )
 
 type PresenceService struct {
@@ -23,7 +25,7 @@ func NewPresenceService(
 	}
 }
 
-func (s *PresenceService) SetOnline(userID string) error {
+func (s *PresenceService) SetOnline(userID uint) error {
 	if err := s.presenceRepo.SetOnline(userID); err != nil {
 		return err
 	}
@@ -32,7 +34,7 @@ func (s *PresenceService) SetOnline(userID string) error {
 	return nil
 }
 
-func (s *PresenceService) SetOffline(userID string) error {
+func (s *PresenceService) SetOffline(userID uint) error {
 	if err := s.presenceRepo.SetOffline(userID); err != nil {
 		return err
 	}
@@ -43,4 +45,8 @@ func (s *PresenceService) SetOffline(userID string) error {
 
 func (s *PresenceService) GetOnlineFriends(userIDs []uint) ([]uint, error) {
 	return s.presenceRepo.GetOnlineFriends(userIDs)
+}
+
+func (s *PresenceService) SubscribeToStatusUpdates(ctx context.Context) (<-chan *models.StatusUpdate, error) {
+	return s.presenceRepo.SubscribeToStatusUpdates(ctx)
 }

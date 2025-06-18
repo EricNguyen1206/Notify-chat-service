@@ -90,11 +90,5 @@ func (h *UserHandler) RegisterRoutes(r *gin.RouterGroup) {
 		// Protected routes
 		user.Use(middleware.Auth())
 		user.GET("/profile", h.GetProfile)
-		// WebSocket
-		// user.POST("/friends", h.SendFriendRequest)
-		// user.GET("/friends", h.GetFriends)
-		// user.GET("/friends/pending", h.GetPendingFriends)
-		// user.POST("/friends/accept/:id", h.AcceptFriendRequest)
-		// user.POST("/friends/reject/:id", h.RejectFriendRequest)
 	}
 }

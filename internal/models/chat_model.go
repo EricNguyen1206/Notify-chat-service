@@ -28,6 +28,14 @@ type Chat struct {
 	Channel Channel `gorm:"foreignKey:ChannelID;references:ID"`
 }
 
+// DirectMessage represents direct message relationships
+type DirectMessage struct {
+	ID          string         `gorm:"primaryKey;type:uuid;default:uuid_generate_v4()" json:"id"`
+	OwnerEmail  string         `gorm:"not null;type:varchar(255)" json:"ownerEmail"`
+	FriendEmail string         `gorm:"not null;type:varchar(255)" json:"friendEmail"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
 /** -------------------- DTOs -------------------- */
 // Websocket
 type Message struct {

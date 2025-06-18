@@ -1,8 +1,8 @@
 package chat
 
 import (
+	"chat-service/configs/utils/ws"
 	"chat-service/internal/models"
-	"chat-service/internal/ws"
 	"context"
 	"errors"
 	"time"

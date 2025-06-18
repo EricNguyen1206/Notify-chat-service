@@ -4,8 +4,12 @@ import (
 	"chat-service/configs"
 	"chat-service/configs/database"
 	"chat-service/configs/middleware"
-	"chat-service/internal/user"
-	"chat-service/internal/ws"
+	"chat-service/configs/utils/ws"
+	"chat-service/internal/handler"
+	"chat-service/internal/repository"
+	"chat-service/internal/service"
+	"fmt"
+	"log"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -25,7 +29,7 @@ func NewApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	database.InitRedis()
+	redisClient, _ := database.InitRedis()
 
 	// mongoDB, err := database.NewMongoConnection()
 	// if err != nil {
@@ -33,31 +37,45 @@ func NewApp() (*App, error) {
 	// }
 
 	// Initialize WebSocket hub
-	// websocketHub := ws.NewHub()
-	// wsHandler := ws.NewWsHandler(websocketHub)
-	// go websocketHub.Run()
+	hub := ws.NewHub()
 
-	// Initialize user domain
-	userRepo := user.NewUserRepository(postgresDB)
-	userService := user.NewUserService(userRepo, config.App.JWTSecret, database.RedisClient)
-	userHandler := user.NewUserHandler(userService, database.RedisClient)
+	// Repository
+	userRepo := repository.NewUserRepository(postgresDB)
+	friendRepo := repository.NewFriendRepository(postgresDB, redisClient)
+	presenceRepo := repository.NewPresenceRepository(redisClient)
 
-	// Initialize category domain
-	// categoryRepo := category.NewCategoryRepository(postgresDB)
-	// categoryService := category.NewCategoryService(categoryRepo)
-	// categoryHandler := category.NewCategoryHandler(categoryService)
+	// Service
+	userService := service.NewUserService(userRepo, config.App.JWTSecret, redisClient)
+	presenceService := service.NewPresenceService(presenceRepo, friendRepo, hub)
+	friendService := service.NewFriendService(friendRepo)
 
-	// Initialize server domain
-	// serverRepo := server.NewServerRepository(postgresDB)
-	// serverService := server.NewServerService(serverRepo)
-	// serverHandler := server.NewServerHandler(serverService)
+	// Handler
+	userHandler := handler.NewUserHandler(userService, redisClient)
+	presenceHandler := handler.NewPresenceHandler(presenceService, friendService, hub)
+	friendHandler := handler.NewFriendHandler(friendService)
 
 	// Setup router
 	router := gin.Default()
-	router.Use(middleware.CORS())
-	// wsHandler.RegisterRoutes(router)
 
-	// Register routes
+	// Add CORS middleware
+	router.Use(middleware.CORS())
+
+	// Add logging middleware
+	router.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
+		return fmt.Sprintf("[%s] | %s | %d | %s | %s | %s | %s | %s | %s\n",
+			param.TimeStamp.Format("2006-01-02 15:04:05"),
+			param.ClientIP,
+			param.StatusCode,
+			param.Method,
+			param.Path,
+			param.Request.UserAgent(),
+			param.ErrorMessage,
+			param.Latency,
+			param.Request.Proto,
+		)
+	}))
+
+	// Register API routes
 	api := router.Group("/api")
 	{
 		api.GET("/health", func(c *gin.Context) {
@@ -66,7 +84,14 @@ func NewApp() (*App, error) {
 			})
 		})
 
+		// WebSocket routes
+		wsGroup := api.Group("/ws")
+		{
+			presenceHandler.RegisterRoutes(wsGroup)
+		}
+
 		userHandler.RegisterRoutes(api)
+		friendHandler.RegisterRoutes(api)
 		// categoryHandler.RegisterRoutes(api)
 		// serverHandler.RegisterRoutes(api)
 	}
@@ -75,10 +100,11 @@ func NewApp() (*App, error) {
 		router:     router,
 		postgresDB: postgresDB,
 		// mongoDB:      mongoDB,
-		// websocketHub: websocketHub,
+		websocketHub: hub,
 	}, nil
 }
 
 func (a *App) Run() error {
-	return a.router.Run(":" + "8080")
+	log.Printf("Starting server on port 8080...")
+	return a.router.Run(":8080")
 }
