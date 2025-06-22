@@ -1,121 +1,118 @@
 package ws
 
 import (
-	"chat-service/internal/models"
-	"log"
+	"encoding/json"
+	"fmt"
 	"sync"
-
-	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
+	"time"
 )
 
 type Hub struct {
-	clients map[uint]*websocket.Conn // userID -> connection
-	mu      sync.RWMutex
+	clients     map[uint]map[*Client]bool // userID -> client connections (support multiple tabs)
+	register    chan *Client
+	unregister  chan *Client
+	directQueue chan DirectMessage
+
+	mu sync.RWMutex
 }
 
-func NewHub() *Hub {
-	log.Printf("Creating new WebSocket hub")
-	return &Hub{
-		clients: make(map[uint]*websocket.Conn),
+var ChatHub = newHub()
+
+func newHub() *Hub {
+	h := &Hub{
+		clients:     make(map[uint]map[*Client]bool),
+		register:    make(chan *Client),
+		unregister:  make(chan *Client),
+		directQueue: make(chan DirectMessage),
 	}
+	go h.Run()
+	return h
 }
 
-// Register - Add connection to hub
-func (h *Hub) Register(userID uint, conn *websocket.Conn) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	log.Printf("Registering user %d in WebSocket hub", userID)
-	h.clients[userID] = conn
-}
+func (h *Hub) Run() {
+	for {
+		select {
+		case client := <-h.register:
+			h.addClient(client)
 
-// Unregister - Remove connection
-func (h *Hub) Unregister(userID uint) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	log.Printf("Unregistering user %d from WebSocket hub", userID)
-	delete(h.clients, userID)
-}
+		case client := <-h.unregister:
+			h.removeClient(client)
 
-// SendToUser - Send message to a specific user
-func (h *Hub) SendToUser(userID uint, message interface{}) error {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	conn, ok := h.clients[userID]
-	if !ok {
-		log.Printf("User %d not found in WebSocket hub", userID)
-		return nil // User not online
-	}
-	log.Printf("Sending message to user %d", userID)
-	return conn.WriteJSON(message)
-}
-
-// BroadcastUserStatus - Notify when user goes online/offline
-func (h *Hub) BroadcastUserStatus(id uint, status models.UserStatus) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
-	log.Printf("Broadcasting friend status: user %d is %s", id, status)
-
-	message := gin.H{
-		"type": "friend_status",
-		"data": gin.H{
-			"userId": id,
-			"status": status,
-		},
-	}
-
-	// Send to all online users
-	for userID, conn := range h.clients {
-		if userID != id { // Don't send to the user who changed status
-			log.Printf("Sending status update to user %d", userID)
-			if err := conn.WriteJSON(message); err != nil {
-				log.Printf("Error sending status update to user %d: %v", userID, err)
-				conn.Close()
-				delete(h.clients, userID)
-				continue
-			}
+		case msg := <-h.directQueue:
+			h.sendDirectMessage(msg)
 		}
 	}
 }
 
-// BroadcastFriendStatus - Notify when friend goes online/offline
-func (h *Hub) BroadcastFriendStatus(friendID uint, status models.UserStatus) {
+func (h *Hub) addClient(client *Client) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if h.clients[client.UserID] == nil {
+		h.clients[client.UserID] = make(map[*Client]bool)
+	}
+	h.clients[client.UserID][client] = true
+	fmt.Println("User", client.UserID, "connected")
+}
+
+// Public method to regist new client
+func (h *Hub) RegisterClient(client *Client) {
+	h.register <- client
+}
+
+// Public method to unregister client
+func (h *Hub) UnregisterClient(client *Client) {
+	h.unregister <- client
+}
+
+// Public method send message 1-1
+func (h *Hub) SendDirectMessage(msg DirectMessage) {
+	h.directQueue <- msg
+}
+
+func (h *Hub) removeClient(client *Client) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if _, ok := h.clients[client.UserID]; ok {
+		delete(h.clients[client.UserID], client)
+		if len(h.clients[client.UserID]) == 0 {
+			delete(h.clients, client.UserID)
+		}
+	}
+	fmt.Println("User", client.UserID, "disconnected")
+}
+
+func (h *Hub) sendDirectMessage(msg DirectMessage) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
-	log.Printf("Broadcasting friend status: user %d is %s", friendID, status)
-
-	message := gin.H{
-		"type": "friend_status",
-		"data": gin.H{
-			"userId": friendID,
-			"status": status,
-		},
+	payload := struct {
+		From      uint      `json:"from"`
+		To        uint      `json:"to"`
+		Content   string    `json:"content"`
+		Timestamp time.Time `json:"timestamp"`
+	}{
+		From:      msg.FromUserID,
+		To:        msg.ToUserID,
+		Content:   msg.Content,
+		Timestamp: msg.Timestamp,
 	}
 
-	// Send to all online users
-	for userID, conn := range h.clients {
-		if userID != friendID { // Don't send to the user who changed status
-			log.Printf("Sending status update to user %d", userID)
-			if err := conn.WriteJSON(message); err != nil {
-				log.Printf("Error sending status update to user %d: %v", userID, err)
-				conn.Close()
-				delete(h.clients, userID)
-				continue
+	data, err := json.Marshal(payload)
+	if err != nil {
+		fmt.Println("❌ Failed to marshal message:", err)
+		return
+	}
+
+	if receivers, ok := h.clients[msg.ToUserID]; ok {
+		for client := range receivers {
+			select {
+			case client.Send <- data:
+			default:
+				// If channel is full, remove client
+				go h.removeClient(client)
 			}
 		}
 	}
-}
-
-// GetOnlineUsers - Get list of online users
-func (h *Hub) GetOnlineUsers() []uint {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
-	users := make([]uint, 0, len(h.clients))
-	for userID := range h.clients {
-		users = append(users, userID)
-	}
-	return users
 }

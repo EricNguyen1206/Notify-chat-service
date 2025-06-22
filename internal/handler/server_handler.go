@@ -1,23 +1,28 @@
-package server
+package handler
 
 import (
+	"chat-service/configs/utils"
 	"chat-service/internal/models"
+	"chat-service/internal/service"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
 type ServerHandler struct {
-	serverService ServerService
+	serverService service.ServerService
 }
 
-func NewServerHandler(serverService ServerService) *ServerHandler {
+func NewServerHandler(serverService service.ServerService) *ServerHandler {
 	return &ServerHandler{serverService: serverService}
 }
 
 func (h *ServerHandler) CreateServer(c *gin.Context) {
-	userID := c.GetString("userID")
-	if userID == "" {
+	userIDToken := c.GetString("userID")
+
+	userID, err := utils.StringToUint(userIDToken)
+
+	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
@@ -38,7 +43,13 @@ func (h *ServerHandler) CreateServer(c *gin.Context) {
 }
 
 func (h *ServerHandler) GetServer(c *gin.Context) {
-	id := c.Param("id")
+	idParam := c.Param("id")
+	id, err := utils.StringToUint(idParam)
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
 	server, err := h.serverService.GetServer(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -49,8 +60,10 @@ func (h *ServerHandler) GetServer(c *gin.Context) {
 }
 
 func (h *ServerHandler) GetUserServers(c *gin.Context) {
-	userID := c.GetString("userID")
-	if userID == "" {
+	userIDToken := c.GetString("userID")
+	userID, err := utils.StringToUint(userIDToken)
+
+	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
@@ -65,13 +78,15 @@ func (h *ServerHandler) GetUserServers(c *gin.Context) {
 }
 
 func (h *ServerHandler) UpdateServer(c *gin.Context) {
-	userID := c.GetString("userID")
-	if userID == "" {
+	userIDToken := c.GetString("userID")
+	userID, err := utils.StringToUint(userIDToken)
+
+	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
-	id := c.Param("id")
+	id, _ := utils.StringToUint(c.Param("id"))
 	var req models.UpdateServerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -88,13 +103,17 @@ func (h *ServerHandler) UpdateServer(c *gin.Context) {
 }
 
 func (h *ServerHandler) DeleteServer(c *gin.Context) {
-	userID := c.GetString("userID")
-	if userID == "" {
+	userIDToken := c.GetString("userID")
+	userID, err := utils.StringToUint(userIDToken)
+
+	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
-	id := c.Param("id")
+	idParam := c.Param("id")
+	id, _ := utils.StringToUint(idParam)
+
 	if err := h.serverService.DeleteServer(c.Request.Context(), id, userID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -104,8 +123,10 @@ func (h *ServerHandler) DeleteServer(c *gin.Context) {
 }
 
 func (h *ServerHandler) JoinServer(c *gin.Context) {
-	userID := c.GetString("userID")
-	if userID == "" {
+	userIDToken := c.GetString("userID")
+	userID, err := utils.StringToUint(userIDToken)
+
+	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
@@ -125,13 +146,15 @@ func (h *ServerHandler) JoinServer(c *gin.Context) {
 }
 
 func (h *ServerHandler) LeaveServer(c *gin.Context) {
-	userID := c.GetString("userID")
-	if userID == "" {
+	userIDToken := c.GetString("userID")
+	userID, err := utils.StringToUint(userIDToken)
+
+	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
-	serverID := c.Param("id")
+	serverID, _ := utils.StringToUint(c.Param("id"))
 	if err := h.serverService.LeaveServer(c.Request.Context(), serverID, userID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -141,7 +164,7 @@ func (h *ServerHandler) LeaveServer(c *gin.Context) {
 }
 
 func (h *ServerHandler) GetServerMembers(c *gin.Context) {
-	serverID := c.Param("id")
+	serverID, _ := utils.StringToUint(c.Param("id"))
 	members, err := h.serverService.GetServerMembers(c.Request.Context(), serverID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

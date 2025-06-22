@@ -30,7 +30,7 @@ func (s *PresenceService) SetOnline(userID uint) error {
 		return err
 	}
 	// Broadcast cho bạn bè biết user này online
-	s.hub.BroadcastFriendStatus(userID, "online")
+	// s.hub.BroadcastFriendStatus(userID, "online")
 	return nil
 }
 
@@ -39,7 +39,7 @@ func (s *PresenceService) SetOffline(userID uint) error {
 		return err
 	}
 	// Broadcast cho bạn bè biết user này offline
-	s.hub.BroadcastFriendStatus(userID, "offline")
+	// s.hub.BroadcastFriendStatus(userID, "offline")
 	return nil
 }
 

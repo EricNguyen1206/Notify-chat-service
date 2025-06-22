@@ -1,40 +1,34 @@
 package models
 
 import (
-	// "chat-service/internal/category"
-
 	"time"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 /** --------------------ENTITIES-------------------- */
 // Server represents a server entity
 type Server struct {
-	ID        string         `gorm:"primaryKey;type:uuid;default:uuid_generate_v4()" json:"id"`
-	Name      string         `gorm:"not null;type:text" json:"name"`
-	Owner     string         `gorm:"not null;type:uuid" json:"owner"` // userid
-	Avatar    string         `gorm:"nullable;type:varchar(255)" json:"avatar"`
-	Created   time.Time      `gorm:"default:CURRENT_TIMESTAMP;type:timestamp" json:"created"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	gorm.Model
+	Name    string `gorm:"not null;type:text" json:"name"`
+	Avatar  string `gorm:"nullable;type:varchar(255)" json:"avatar"`
+	OwnerId uint   `gorm:"type:uint" json:"ownerId"`
 
-	Categories []Category   `gorm:"foreignKey:ServerID;references:ID"`
-	Members    []JoinServer `gorm:"foreignKey:ServerID;references:ID"`
+	Channels []Channel
+	Members  []*User `gorm:"many2many:server_members"`
 }
 
 func (s *Server) BeforeCreate(tx *gorm.DB) error {
-	if s.ID == "" {
-		s.ID = uuid.New().String()
-	}
+	// if s.ID == "" {
+	// 	s.ID = uuid.New().String()
+	// }
 	return nil
 }
 
 // JoinServer represents server membership
-type JoinServer struct {
-	ID         string         `gorm:"primaryKey;type:uuid;default:uuid_generate_v4()" json:"id"`
-	ServerID   string         `gorm:"not null" json:"serverId"`
-	UserID     string         `gorm:"not null" json:"userId"`
+type ServerMembers struct {
+	ServerID   uint           `gorm:"not null" json:"serverId"`
+	UserID     uint           `gorm:"not null" json:"userId"`
 	JoinedDate time.Time      `gorm:"default:CURRENT_TIMESTAMP" json:"joinedDate"`
 	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
 }
@@ -52,22 +46,21 @@ type UpdateServerRequest struct {
 }
 
 type JoinServerRequest struct {
-	ServerID string `json:"serverId" binding:"required"`
+	ServerID uint `json:"serverId" binding:"required"`
 }
 
 // Response
 type ServerResponse struct {
-	ID      string               `json:"id"`
-	Name    string               `json:"name"`
-	Owner   string               `json:"owner"`
-	Avatar  string               `json:"avatar"`
-	Created time.Time            `json:"created"`
-	Members []JoinServerResponse `json:"members,omitempty"`
+	ID        uint                 `json:"id"`
+	Name      string               `json:"name"`
+	OwnerId   uint                 `json:"owner"`
+	Avatar    string               `json:"avatar"`
+	CreatedAt time.Time            `json:"created"`
+	Members   []JoinServerResponse `json:"members,omitempty"`
 }
 
 type JoinServerResponse struct {
-	ID         string    `json:"id"`
-	ServerID   string    `json:"serverId"`
-	UserID     string    `json:"userId"`
+	ServerID   uint      `json:"serverId"`
+	UserID     uint      `json:"userId"`
 	JoinedDate time.Time `json:"joinedDate"`
 }

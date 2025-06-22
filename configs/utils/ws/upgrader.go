@@ -12,11 +12,11 @@ var Upgrader = websocket.Upgrader{
 		log.Printf("Checking origin for WebSocket connection: %s", r.Header.Get("Origin"))
 		return true // Allow all origins (should whitelist in production)
 	},
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	// Add these to ensure proper handshake
-	EnableCompression: true,
-	HandshakeTimeout:  10,
+	// ReadBufferSize:  1024,
+	// WriteBufferSize: 1024,
+	// // Add these to ensure proper handshake
+	// EnableCompression: true,
+	// HandshakeTimeout:  10,
 }
 
 // Add these constants for WebSocket message types

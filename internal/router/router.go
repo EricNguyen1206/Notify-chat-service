@@ -4,7 +4,6 @@ import (
 	"chat-service/configs"
 	"chat-service/configs/database"
 	"chat-service/configs/middleware"
-	"chat-service/configs/utils/ws"
 	"chat-service/internal/handler"
 	"chat-service/internal/repository"
 	"chat-service/internal/service"
@@ -19,7 +18,7 @@ type App struct {
 	router     *gin.Engine
 	postgresDB *gorm.DB
 	// mongoDB      *database.MongoDB
-	websocketHub *ws.Hub
+	// websocketHub *ws.Hub
 }
 
 func NewApp() (*App, error) {
@@ -37,22 +36,22 @@ func NewApp() (*App, error) {
 	// }
 
 	// Initialize WebSocket hub
-	hub := ws.NewHub()
+	// hub := ws.NewHub()
 
 	// Repository
 	userRepo := repository.NewUserRepository(postgresDB)
 	friendRepo := repository.NewFriendRepository(postgresDB, redisClient)
-	presenceRepo := repository.NewPresenceRepository(redisClient)
+	// presenceRepo := repository.NewPresenceRepository(redisClient)
 
 	// Service
 	userService := service.NewUserService(userRepo, config.App.JWTSecret, redisClient)
-	presenceService := service.NewPresenceService(presenceRepo, friendRepo, hub)
 	friendService := service.NewFriendService(friendRepo)
+	// presenceService := service.NewPresenceService(presenceRepo, friendRepo, hub)
 
 	// Handler
 	userHandler := handler.NewUserHandler(userService, redisClient)
-	presenceHandler := handler.NewPresenceHandler(presenceService, friendService, hub)
 	friendHandler := handler.NewFriendHandler(friendService)
+	// presenceHandler := handler.NewPresenceHandler(presenceService, friendService, hub)
 
 	// Setup router
 	router := gin.Default()
@@ -75,6 +74,9 @@ func NewApp() (*App, error) {
 		)
 	}))
 
+	// WebSocket routes
+	// router.GET("/ws", handler.HandleWebSocket)
+
 	// Register API routes
 	api := router.Group("/api")
 	{
@@ -83,12 +85,6 @@ func NewApp() (*App, error) {
 				"status": "UP",
 			})
 		})
-
-		// WebSocket routes
-		wsGroup := api.Group("/ws")
-		{
-			presenceHandler.RegisterRoutes(wsGroup)
-		}
 
 		userHandler.RegisterRoutes(api)
 		friendHandler.RegisterRoutes(api)
@@ -100,7 +96,7 @@ func NewApp() (*App, error) {
 		router:     router,
 		postgresDB: postgresDB,
 		// mongoDB:      mongoDB,
-		websocketHub: hub,
+		// websocketHub: hub,
 	}, nil
 }
 
