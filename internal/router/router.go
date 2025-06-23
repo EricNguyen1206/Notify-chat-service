@@ -41,17 +41,17 @@ func NewApp() (*App, error) {
 	// Repository
 	userRepo := repository.NewUserRepository(postgresDB)
 	friendRepo := repository.NewFriendRepository(postgresDB, redisClient)
-	// presenceRepo := repository.NewPresenceRepository(redisClient)
+	serverRepo := repository.NewServerRepository(postgresDB)
 
 	// Service
 	userService := service.NewUserService(userRepo, config.App.JWTSecret, redisClient)
 	friendService := service.NewFriendService(friendRepo)
-	// presenceService := service.NewPresenceService(presenceRepo, friendRepo, hub)
+	serverService := service.NewServerService(serverRepo)
 
 	// Handler
 	userHandler := handler.NewUserHandler(userService, redisClient)
 	friendHandler := handler.NewFriendHandler(friendService)
-	// presenceHandler := handler.NewPresenceHandler(presenceService, friendService, hub)
+	serverHandler := handler.NewServerHandler(serverService)
 
 	// Setup router
 	router := gin.Default()
@@ -88,8 +88,8 @@ func NewApp() (*App, error) {
 
 		userHandler.RegisterRoutes(api)
 		friendHandler.RegisterRoutes(api)
+		serverHandler.RegisterRoutes(api)
 		// categoryHandler.RegisterRoutes(api)
-		// serverHandler.RegisterRoutes(api)
 	}
 
 	return &App{

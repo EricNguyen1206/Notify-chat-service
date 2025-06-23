@@ -8,7 +8,7 @@ type Friend struct {
 	gorm.Model
 	UserID   uint   `gorm:"not null" json:"userId"`
 	FriendID uint   `gorm:"not null" json:"friendId"`
-	Status   string `gorm:"not null;type:varchar(255)" json:"status"` // pending, accepted, blocked, etc.
+	Status   string `gorm:"type:varchar(20);check:status IN ('pending','accepted','blocked');not null"`
 
 	User   User `gorm:"foreignKey:UserID;references:ID" json:"user"`
 	Friend User `gorm:"foreignKey:FriendID;references:ID" json:"friend"`

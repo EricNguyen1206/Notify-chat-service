@@ -73,12 +73,11 @@ func NewPostgresConnection() (*gorm.DB, error) {
 	// Auto migrate the schema with proper error handling
 	err = db.AutoMigrate(
 		&models.User{},
-		// &models.Server{},
-		// &models.Channel{},
-		// &models.Chat{},
+		&models.Server{},
+		&models.ServerMembers{},
+		&models.Channel{},
+		&models.Chat{},
 		&models.Friend{},
-		// &models.FriendPending{},
-		// &models.DirectMessage{},
 		// &models.JoinServer{},
 	)
 	if err != nil {

@@ -20,7 +20,7 @@ type Chat struct {
 	gorm.Model
 
 	SenderID uint   `gorm:"not null" json:"senderId"`
-	Type     string `gorm:"not null;type:enum('direct','channel')" json:"type"` // Use consts
+	Type     string `gorm:"not null;type:varchar(20);check:type IN ('direct', 'channel')" json:"type"` // Use consts
 
 	ReceiverID *uint `gorm:"type:uint" json:"receiverId"` // only if type == direct
 	ServerID   *uint `gorm:"type:uint" json:"serverId"`   // only if type == channel
@@ -34,14 +34,6 @@ type Chat struct {
 	Receiver *User    `gorm:"foreignKey:ReceiverID"` // pointer to allow null
 	Server   *Server  `gorm:"foreignKey:ServerID"`
 	Channel  *Channel `gorm:"foreignKey:ChannelID"`
-}
-
-// DirectMessage represents direct message relationships
-type DirectMessage struct {
-	ID            string         `gorm:"primaryKey;type:uuid;default:uuid_generate_v4()" json:"id"`
-	OwnerEmail    string         `gorm:"not null;type:varchar(255)" json:"ownerEmail"`
-	ReceiverEmail string         `gorm:"not null;type:varchar(255)" json:"friendEmail"`
-	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 /** -------------------- DTOs -------------------- */

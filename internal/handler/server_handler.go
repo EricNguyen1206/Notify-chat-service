@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"chat-service/configs/middleware"
 	"chat-service/configs/utils"
 	"chat-service/internal/models"
 	"chat-service/internal/service"
@@ -18,11 +19,15 @@ func NewServerHandler(serverService service.ServerService) *ServerHandler {
 }
 
 func (h *ServerHandler) CreateServer(c *gin.Context) {
-	userIDToken := c.GetString("userID")
+	userIDToken, exists := c.Get("user_id")
+	getError := c.GetString("error")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": getError})
+		return
+	}
+	userID, ok := userIDToken.(uint)
 
-	userID, err := utils.StringToUint(userIDToken)
-
-	if err != nil {
+	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
@@ -60,10 +65,14 @@ func (h *ServerHandler) GetServer(c *gin.Context) {
 }
 
 func (h *ServerHandler) GetUserServers(c *gin.Context) {
-	userIDToken := c.GetString("userID")
-	userID, err := utils.StringToUint(userIDToken)
-
-	if err != nil {
+	userIDToken, exists := c.Get("user_id")
+	getError := c.GetString("error")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": getError})
+		return
+	}
+	userID, ok := userIDToken.(uint)
+	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
@@ -78,10 +87,14 @@ func (h *ServerHandler) GetUserServers(c *gin.Context) {
 }
 
 func (h *ServerHandler) UpdateServer(c *gin.Context) {
-	userIDToken := c.GetString("userID")
-	userID, err := utils.StringToUint(userIDToken)
-
-	if err != nil {
+	userIDToken, exists := c.Get("user_id")
+	getError := c.GetString("error")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": getError})
+		return
+	}
+	userID, ok := userIDToken.(uint)
+	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
@@ -103,10 +116,14 @@ func (h *ServerHandler) UpdateServer(c *gin.Context) {
 }
 
 func (h *ServerHandler) DeleteServer(c *gin.Context) {
-	userIDToken := c.GetString("userID")
-	userID, err := utils.StringToUint(userIDToken)
-
-	if err != nil {
+	userIDToken, exists := c.Get("user_id")
+	getError := c.GetString("error")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": getError})
+		return
+	}
+	userID, ok := userIDToken.(uint)
+	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
@@ -123,10 +140,14 @@ func (h *ServerHandler) DeleteServer(c *gin.Context) {
 }
 
 func (h *ServerHandler) JoinServer(c *gin.Context) {
-	userIDToken := c.GetString("userID")
-	userID, err := utils.StringToUint(userIDToken)
-
-	if err != nil {
+	userIDToken, exists := c.Get("user_id")
+	getError := c.GetString("error")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": getError})
+		return
+	}
+	userID, ok := userIDToken.(uint)
+	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
@@ -146,10 +167,14 @@ func (h *ServerHandler) JoinServer(c *gin.Context) {
 }
 
 func (h *ServerHandler) LeaveServer(c *gin.Context) {
-	userIDToken := c.GetString("userID")
-	userID, err := utils.StringToUint(userIDToken)
-
-	if err != nil {
+	userIDToken, exists := c.Get("user_id")
+	getError := c.GetString("error")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": getError})
+		return
+	}
+	userID, ok := userIDToken.(uint)
+	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
@@ -177,6 +202,8 @@ func (h *ServerHandler) GetServerMembers(c *gin.Context) {
 func (h *ServerHandler) RegisterRoutes(r *gin.RouterGroup) {
 	servers := r.Group("/servers")
 	{
+
+		servers.Use(middleware.Auth())
 		servers.POST("", h.CreateServer)
 		servers.GET("/:id", h.GetServer)
 		servers.GET("/user", h.GetUserServers)
