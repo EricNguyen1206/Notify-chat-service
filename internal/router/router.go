@@ -41,6 +41,7 @@ func NewApp() (*App, error) {
 	// Repository
 	userRepo := repository.NewUserRepository(postgresDB)
 	friendRepo := repository.NewFriendRepository(postgresDB, redisClient)
+	
 	// presenceRepo := repository.NewPresenceRepository(redisClient)
 
 	// Service
