@@ -4,11 +4,11 @@ import (
 	"gorm.io/gorm"
 )
 
-type Friendship struct {
+type Friend struct {
 	gorm.Model
 	UserID   uint   `gorm:"not null" json:"userId"`
 	FriendID uint   `gorm:"not null" json:"friendId"`
-	Status    string    `gorm:"type:enum('pending','accepted','blocked');not null"`
+	Status   string `gorm:"type:varchar(20);check:status IN ('pending','accepted','blocked');not null"`
 
 	User   User `gorm:"foreignKey:UserID;references:ID" json:"user"`
 	Friend User `gorm:"foreignKey:FriendID;references:ID" json:"friend"`

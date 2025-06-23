@@ -74,9 +74,10 @@ func NewPostgresConnection() (*gorm.DB, error) {
 	err = db.AutoMigrate(
 		&models.User{},
 		&models.Server{},
+		&models.ServerMembers{},
 		&models.Channel{},
 		&models.Chat{},
-		&models.Friendship {},
+		&models.Friend{},
 		// &models.JoinServer{},
 	)
 	if err != nil {

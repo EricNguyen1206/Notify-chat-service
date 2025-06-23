@@ -12,8 +12,8 @@ import (
 type FriendRepository interface {
 	AddFriend(ctx context.Context, userID, friendID uint) error
 	RemoveFriend(ctx context.Context, userID, friendID uint) error
-	GetFriendsByUserID(ctx context.Context, userID uint) ([]models.Friendship, error)
-	GetFriendsByFriendID(ctx context.Context, userID uint) ([]models.Friendship, error)
+	GetFriendsByUserID(ctx context.Context, userID uint) ([]models.Friend, error)
+	GetFriendsByFriendID(ctx context.Context, userID uint) ([]models.Friend, error)
 	IsFriend(ctx context.Context, userID, friendID uint) (bool, error)
 }
 
@@ -28,7 +28,7 @@ func NewFriendRepository(db *gorm.DB, redisClient *redis.Client) FriendRepositor
 
 func (r *friendRepository) AddFriend(ctx context.Context, userID, friendID uint) error {
 	// Tạo quan hệ hai chiều (user -> friend và friend -> user)
-	friendship := models.Friendship{
+	friendship := models.Friend{
 		UserID:   userID,
 		FriendID: friendID,
 		Status:   "accepted", // Hoặc "accepted" tùy logic
@@ -42,7 +42,7 @@ func (r *friendRepository) RemoveFriend(ctx context.Context, userID, friendID ui
 	err := r.db.WithContext(ctx).
 		Where("(user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)",
 			userID, friendID, friendID, userID).
-		Delete(&models.Friendship{}).Error
+		Delete(&models.Friend{}).Error
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return errors.New("friendship not found")
@@ -50,8 +50,8 @@ func (r *friendRepository) RemoveFriend(ctx context.Context, userID, friendID ui
 	return err
 }
 
-func (r *friendRepository) GetFriendsByUserID(ctx context.Context, userID uint) ([]models.Friendship, error) {
-	var friends []models.Friendship
+func (r *friendRepository) GetFriendsByUserID(ctx context.Context, userID uint) ([]models.Friend, error) {
+	var friends []models.Friend
 	err := r.db.WithContext(ctx).
 		Preload("Friend").
 		Where("user_id = ? AND status = ?", userID, "accepted").
@@ -59,8 +59,8 @@ func (r *friendRepository) GetFriendsByUserID(ctx context.Context, userID uint) 
 	return friends, err
 }
 
-func (r *friendRepository) GetFriendsByFriendID(ctx context.Context, friendId uint) ([]models.Friendship, error) {
-	var friends []models.Friendship
+func (r *friendRepository) GetFriendsByFriendID(ctx context.Context, friendId uint) ([]models.Friend, error) {
+	var friends []models.Friend
 	err := r.db.WithContext(ctx).
 		Preload("User").
 		Where("friend_id = ? AND status = ?", friendId, "accepted").
@@ -71,7 +71,7 @@ func (r *friendRepository) GetFriendsByFriendID(ctx context.Context, friendId ui
 func (r *friendRepository) IsFriend(ctx context.Context, userID, friendID uint) (bool, error) {
 	var count int64
 	err := r.db.WithContext(ctx).
-		Model(&models.Friendship{}).
+		Model(&models.Friend{}).
 		Where("(user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)",
 			userID, friendID, friendID, userID).
 		Count(&count).Error

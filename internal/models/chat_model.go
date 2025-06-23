@@ -20,7 +20,7 @@ type Chat struct {
 	gorm.Model
 
 	SenderID uint   `gorm:"not null" json:"senderId"`
-	Type     string `gorm:"not null;type:enum('direct','channel')" json:"type"` // Use consts
+	Type     string `gorm:"not null;type:varchar(20);check:type IN ('direct', 'channel')" json:"type"` // Use consts
 
 	ReceiverID *uint `gorm:"type:uint" json:"receiverId"` // only if type == direct
 	ServerID   *uint `gorm:"type:uint" json:"serverId"`   // only if type == channel

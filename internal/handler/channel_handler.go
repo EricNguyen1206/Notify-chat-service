@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
 	"chat-service/internal/service"
-	"chat-service/internal/models"
+
+	"github.com/gin-gonic/gin"
 )
 
 type ChannelHandler struct {

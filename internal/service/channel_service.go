@@ -1,19 +1,26 @@
 package service
 
+import (
+	"chat-service/internal/models"
+	"chat-service/internal/repository"
+
+	"gorm.io/gorm"
+)
+
 type ChannelService struct {
-	repo *ChannelRepository
+	repo *repository.ChannelRepository
 }
 
-func NewChannelService(repo *ChannelRepository) *ChannelService {
+func NewChannelService(repo *repository.ChannelRepository) *ChannelService {
 	return &ChannelService{repo}
 }
 
-func (s *ChannelService) CreateChannel(name string, ownerID, serverID uint) (*Channel, error) {
-	channel := &Channel{
+func (s *ChannelService) CreateChannel(name string, ownerID, serverID uint) (*models.Channel, error) {
+	channel := &models.Channel{
 		Name:     name,
 		OwnerID:  ownerID,
 		ServerID: serverID,
-		Members:  []*User{{Model: gorm.Model{ID: ownerID}}}, // Auto join
+		Members:  []*models.User{{Model: gorm.Model{ID: ownerID}}}, // Auto join
 	}
 	err := s.repo.Create(channel)
 	return channel, err
@@ -32,11 +39,11 @@ func (s *ChannelService) DeleteChannel(channelID uint) error {
 	return s.repo.Delete(channelID)
 }
 
-func (s *ChannelService) GetChannelByID(channelID uint) (*Channel, error) {
+func (s *ChannelService) GetChannelByID(channelID uint) (*models.Channel, error) {
 	return s.repo.GetByID(channelID)
 }
 
-func (s *ChannelService) GetChannelsByUserAndServer(userID, serverID uint) ([]Channel, error) {
+func (s *ChannelService) GetChannelsByUserAndServer(userID, serverID uint) ([]models.Channel, error) {
 	return s.repo.GetListByUserAndServer(userID, serverID)
 }
 
@@ -52,6 +59,6 @@ func (s *ChannelService) RemoveUserFromChannel(channelID, targetUserID uint) err
 	return s.repo.RemoveUser(channelID, targetUserID)
 }
 
-func (s *ChannelService) GetChatMessagesByChannel(channelID uint) ([]Chat, error) {
+func (s *ChannelService) GetChatMessagesByChannel(channelID uint) ([]models.Chat, error) {
 	return s.repo.GetChatMessages(channelID)
 }
