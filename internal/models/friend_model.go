@@ -4,6 +4,13 @@ import (
 	"gorm.io/gorm"
 )
 
+// Friendship status constants
+const (
+	FriendStatusPending  = "pending"
+	FriendStatusAccepted = "accepted"
+	FriendStatusBlocked  = "blocked"
+)
+
 type Friend struct {
 	gorm.Model
 	UserID   uint   `gorm:"not null" json:"userId"`

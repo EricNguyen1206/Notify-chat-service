@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"chat-service/configs/middleware"
 	"chat-service/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +22,7 @@ func NewChannelHandler(channelService *service.ChannelService) *ChannelHandler {
 func (h *ChannelHandler) RegisterRoutes(r *gin.Engine) {
 	channels := r.Group("/channels")
 	{
+		channels.Use(middleware.Auth())
 		channels.POST("/", h.CreateChannel)
 		channels.PUT("/:id", h.UpdateChannel)
 		channels.DELETE("/:id", h.DeleteChannel)
