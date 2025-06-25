@@ -15,26 +15,52 @@ var (
 	ErrNotAuthorized   = errors.New("not authorized")
 )
 
-type ChatService interface {
-	CreateChat(ctx context.Context, userID uint, req *models.ChatRequest) (*models.ChatResponse, error)
-	GetChat(ctx context.Context, id uint) (*models.ChatResponse, error)
-	GetUserChats(ctx context.Context, userID uint) ([]*models.ChatResponse, error)
-	GetServerChats(ctx context.Context, serverID uint) ([]*models.ChatResponse, error)
-	GetChannelChats(ctx context.Context, channelID uint) ([]*models.ChatResponse, error)
-	GetFriendChats(ctx context.Context, friendID uint) ([]*models.ChatResponse, error)
-	DeleteChat(ctx context.Context, id uint, userID uint) error
-	BroadcastMessage(hub *ws.Hub, message *models.ChatResponse) error
-}
+// type ChatService interface {
+// 	CreateChat(ctx context.Context, userID uint, req *models.ChatRequest) (*models.ChatResponse, error)
+// 	GetChat(ctx context.Context, id uint) (*models.ChatResponse, error)
+// 	GetUserChats(ctx context.Context, userID uint) ([]*models.ChatResponse, error)
+// 	GetChannelChats(ctx context.Context, channelID uint) ([]*models.ChatResponse, error)
+// 	GetFriendChats(ctx context.Context, friendID uint) ([]*models.ChatResponse, error)
+// 	DeleteChat(ctx context.Context, id uint, userID uint) error
+// 	BroadcastMessage(hub *ws.Hub, message *models.ChatResponse) error
+// }
 
-type chatService struct {
+type ChatService struct {
 	repo repository.ChatRepository
+	friendRepo repository.FriendRepository
 }
 
-func NewChatService(repo repository.ChatRepository) ChatService {
-	return &chatService{repo: repo}
+func NewChatService(repo repository.ChatRepository, friendRepo repository.FriendRepository) ChatService {
+	return &ChatService{repo: repo, friendRepo: friendRepo}
 }
 
-func (s *chatService) CreateChat(ctx context.Context, userID uint, req *models.ChatRequest) (*models.ChatResponse, error) {
+func (s *ChatService) SendDirectMessage(chat *models.Chat) error {
+	receiverID := chat.ReceiverID
+	senderID := chat.SenderID
+	text := chat.Text
+
+	// Handle Friendship
+	reverse, err := s.friendRepo.GetFriendship(receiverID, senderID)
+	if err == nil && reverse.Status == "pending" {
+		_ = s.friendRepo.UpdateFriendshipStatus(receiverID, senderID, "accepted")
+		_ = s.friendRepo.CreateFriendship(senderID, receiverID, "accepted")
+	} else if _, err := s.friendRepo.GetFriendship(senderID, receiverID); err != nil {
+		_ = s.friendRepo.CreateFriendship(senderID, receiverID, "pending")
+	}
+
+	// 🔥 Broadcast WebSocket
+	ws.ChatHub.SendDirectMessage(ws.DirectMessage{
+		FromUserID: senderID,
+		ToUserID:   receiverID,
+		Content:    text,
+		Timestamp:  msg.CreatedAt,
+	})
+
+	return nil
+}
+
+
+func (s *ChatService) CreateChat(ctx context.Context, userID uint, req *models.ChatRequest) (*models.ChatResponse, error) {
 	// Validate chat type and provider
 	if req.Type != string(models.ChatTypeChannel) && req.Type != string(models.ChatTypeDirect) {
 		return nil, ErrInvalidType
@@ -78,7 +104,7 @@ func (s *chatService) CreateChat(ctx context.Context, userID uint, req *models.C
 	}, nil
 }
 
-func (s *chatService) GetChat(ctx context.Context, id uint) (*models.ChatResponse, error) {
+func (s *ChatService) GetChat(ctx context.Context, id uint) (*models.ChatResponse, error) {
 	chat, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, ErrChatNotFound
@@ -98,7 +124,7 @@ func (s *chatService) GetChat(ctx context.Context, id uint) (*models.ChatRespons
 	}, nil
 }
 
-func (s *chatService) GetUserChats(ctx context.Context, userID uint) ([]*models.ChatResponse, error) {
+func (s *ChatService) GetUserChats(ctx context.Context, userID uint) ([]*models.ChatResponse, error) {
 	chats, err := s.repo.FindByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -123,32 +149,7 @@ func (s *chatService) GetUserChats(ctx context.Context, userID uint) ([]*models.
 	return responses, nil
 }
 
-func (s *chatService) GetServerChats(ctx context.Context, serverID uint) ([]*models.ChatResponse, error) {
-	chats, err := s.repo.FindByServerID(ctx, serverID)
-	if err != nil {
-		return nil, err
-	}
-
-	var responses []*models.ChatResponse
-	for _, chat := range chats {
-		responses = append(responses, &models.ChatResponse{
-			ID:         chat.ID,
-			Type:       chat.Type,
-			SenderID:   chat.SenderID,
-			ReceiverID: chat.ReceiverID,
-			ServerID:   chat.ServerID,
-			ChannelID:  chat.ChannelID,
-			Text:       chat.Text,
-			URL:        chat.URL,
-			FileName:   chat.FileName,
-			CreatedAt:  chat.CreatedAt,
-		})
-	}
-
-	return responses, nil
-}
-
-func (s *chatService) GetChannelChats(ctx context.Context, channelID uint) ([]*models.ChatResponse, error) {
+func (s *ChatService) GetChannelChats(ctx context.Context, channelID uint) ([]*models.ChatResponse, error) {
 	chats, err := s.repo.FindByChannelID(ctx, channelID)
 	if err != nil {
 		return nil, err
@@ -173,7 +174,7 @@ func (s *chatService) GetChannelChats(ctx context.Context, channelID uint) ([]*m
 	return responses, nil
 }
 
-func (s *chatService) GetFriendChats(ctx context.Context, receiverId uint) ([]*models.ChatResponse, error) {
+func (s *ChatService) GetFriendChats(ctx context.Context, receiverId uint) ([]*models.ChatResponse, error) {
 	chats, err := s.repo.FindByFriendID(ctx, receiverId)
 	if err != nil {
 		return nil, err
@@ -198,7 +199,7 @@ func (s *chatService) GetFriendChats(ctx context.Context, receiverId uint) ([]*m
 	return responses, nil
 }
 
-func (s *chatService) DeleteChat(ctx context.Context, id uint, userID uint) error {
+func (s *ChatService) DeleteChat(ctx context.Context, id uint, userID uint) error {
 	chat, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return ErrChatNotFound
@@ -211,7 +212,7 @@ func (s *chatService) DeleteChat(ctx context.Context, id uint, userID uint) erro
 	return s.repo.Delete(ctx, id)
 }
 
-func (s *chatService) BroadcastMessage(hub *ws.Hub, message *models.ChatResponse) error {
+func (s *ChatService) BroadcastMessage(hub *ws.Hub, message *models.ChatResponse) error {
 	// Convert message to JSON
 	// data, err := json.Marshal(message)
 	// if err != nil {

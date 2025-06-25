@@ -91,17 +91,6 @@ func (h *ChatHandler) GetUserChats(c *gin.Context) {
 	c.JSON(http.StatusOK, chats)
 }
 
-func (h *ChatHandler) GetServerChats(c *gin.Context) {
-	serverID, _ := utils.StringToUint(c.Param("serverId"))
-	chats, err := h.chatService.GetServerChats(c.Request.Context(), serverID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, chats)
-}
-
 func (h *ChatHandler) GetChannelChats(c *gin.Context) {
 	channelID, _ := utils.StringToUint(c.Param("channelId"))
 	chats, err := h.chatService.GetChannelChats(c.Request.Context(), channelID)
@@ -222,7 +211,6 @@ func (h *ChatHandler) RegisterRoutes(r *gin.RouterGroup) {
 		chats.POST("", h.CreateChat)
 		chats.GET("/:id", h.GetChat)
 		chats.GET("/user", h.GetUserChats)
-		chats.GET("/server/:serverId", h.GetServerChats)
 		chats.GET("/channel/:channelId", h.GetChannelChats)
 		chats.GET("/friend/:friendId", h.GetFriendChats)
 		chats.DELETE("/:id", h.DeleteChat)

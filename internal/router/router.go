@@ -41,16 +41,19 @@ func NewApp() (*App, error) {
 	// Repository
 	userRepo := repository.NewUserRepository(postgresDB)
 	friendRepo := repository.NewFriendRepository(postgresDB, redisClient)
+	channelRepo := repository.NewChannelRepository(postgresDB)
 	serverRepo := repository.NewServerRepository(postgresDB)
 
 	// Service
 	userService := service.NewUserService(userRepo, config.App.JWTSecret, redisClient)
 	friendService := service.NewFriendService(friendRepo)
+	channelService := service.NewChannelService(channelRepo, userRepo, redisClient)
 	serverService := service.NewServerService(serverRepo)
 
 	// Handler
 	userHandler := handler.NewUserHandler(userService, redisClient)
 	friendHandler := handler.NewFriendHandler(friendService)
+	channelHandler := handler.NewChannelHandler(channelService)
 	serverHandler := handler.NewServerHandler(serverService)
 
 	// Setup router
@@ -88,8 +91,8 @@ func NewApp() (*App, error) {
 
 		userHandler.RegisterRoutes(api)
 		friendHandler.RegisterRoutes(api)
+		channelHandler.RegisterRoutes(api)
 		serverHandler.RegisterRoutes(api)
-		// categoryHandler.RegisterRoutes(api)
 	}
 
 	return &App{

@@ -10,7 +10,6 @@ import (
 type Client struct {
 	UserID uint
 	Conn   *websocket.Conn
-	// ServerId string
 	Send chan []byte
 }
 
@@ -20,3 +19,11 @@ type DirectMessage struct {
 	Content    string
 	Timestamp  time.Time
 }
+
+type ChannelMessage struct {
+	FromUserID uint
+	ChannelID  uint
+	Content    string
+	Timestamp  time.Time
+}
+
