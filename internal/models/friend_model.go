@@ -11,7 +11,7 @@ const (
 	FriendStatusBlocked  = "blocked"
 )
 
-type Friend struct {
+type FriendShip struct {
 	gorm.Model
 	UserID   uint   `gorm:"not null" json:"userId"`
 	FriendID uint   `gorm:"not null" json:"friendId"`

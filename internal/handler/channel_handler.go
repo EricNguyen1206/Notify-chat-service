@@ -19,7 +19,7 @@ func NewChannelHandler(channelService *service.ChannelService) *ChannelHandler {
 }
 
 // RegisterRoutes maps HTTP methods to handler functions
-func (h *ChannelHandler) RegisterRoutes(r *gin.Engine) {
+func (h *ChannelHandler) RegisterRoutes(r *gin.RouterGroup) {
 	channels := r.Group("/channels")
 	{
 		channels.Use(middleware.Auth())

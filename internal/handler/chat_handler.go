@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"time"
 
 	"chat-service/configs/utils"
 	"chat-service/configs/utils/ws"
@@ -42,7 +41,7 @@ func (h *ChatHandler) CreateChat(c *gin.Context) {
 		return
 	}
 
-	chat, err := h.chatService.CreateChat(c.Request.Context(), userID, &req)
+	chat, err := h.chatService.CreateChat(userID, &req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -66,7 +65,7 @@ func (h *ChatHandler) CreateChat(c *gin.Context) {
 
 func (h *ChatHandler) GetChat(c *gin.Context) {
 	id, _ := utils.StringToUint(c.Param("id"))
-	chat, err := h.chatService.GetChat(c.Request.Context(), id)
+	chat, err := h.chatService.GetChat(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -82,7 +81,7 @@ func (h *ChatHandler) GetUserChats(c *gin.Context) {
 		return
 	}
 
-	chats, err := h.chatService.GetUserChats(c.Request.Context(), userID)
+	chats, err := h.chatService.GetUserChats(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -93,7 +92,7 @@ func (h *ChatHandler) GetUserChats(c *gin.Context) {
 
 func (h *ChatHandler) GetChannelChats(c *gin.Context) {
 	channelID, _ := utils.StringToUint(c.Param("channelId"))
-	chats, err := h.chatService.GetChannelChats(c.Request.Context(), channelID)
+	chats, err := h.chatService.GetChannelChats(channelID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -104,7 +103,7 @@ func (h *ChatHandler) GetChannelChats(c *gin.Context) {
 
 func (h *ChatHandler) GetFriendChats(c *gin.Context) {
 	friendID, _ := utils.StringToUint(c.Param("friendId"))
-	chats, err := h.chatService.GetFriendChats(c.Request.Context(), friendID)
+	chats, err := h.chatService.GetFriendChats(friendID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -121,7 +120,7 @@ func (h *ChatHandler) DeleteChat(c *gin.Context) {
 	}
 
 	id, _ := utils.StringToUint(c.Param("id"))
-	if err := h.chatService.DeleteChat(c.Request.Context(), id, userID); err != nil {
+	if err := h.chatService.DeleteChat(id, userID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -129,7 +128,7 @@ func (h *ChatHandler) DeleteChat(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func (h *ChatHandler) WebSocket(c *gin.Context) {
+func (h *ChatHandler) WebSocketHandler(c *gin.Context) {
 	// Get user ID from query parameter
 	userIDStr := c.Query("userId")
 	userID, err := strconv.ParseUint(userIDStr, 10, 32)
@@ -139,7 +138,7 @@ func (h *ChatHandler) WebSocket(c *gin.Context) {
 	}
 
 	// serverID := c.Query("serverId")
-
+	// Upgrate http (tcp) to websocket connection
 	var upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool { return true },
 	}
@@ -181,12 +180,12 @@ func readPump(client *ws.Client) {
 			continue
 		}
 
-		ws.ChatHub.SendDirectMessage(ws.DirectMessage{
-			FromUserID: client.UserID,
-			ToUserID:   parsed.To,
-			Content:    parsed.Content,
-			Timestamp:  time.Now().UTC(),
-		})
+		// ws.ChatHub.SendDirectMessage(ws.DirectMessage{
+		// 	FromUserID: client.UserID,
+		// 	ToUserID:   parsed.To,
+		// 	Content:    parsed.Content,
+		// 	Timestamp:  time.Now().UTC(),
+		// })
 	}
 }
 
@@ -214,6 +213,6 @@ func (h *ChatHandler) RegisterRoutes(r *gin.RouterGroup) {
 		chats.GET("/channel/:channelId", h.GetChannelChats)
 		chats.GET("/friend/:friendId", h.GetFriendChats)
 		chats.DELETE("/:id", h.DeleteChat)
-		chats.GET("/ws", h.WebSocket)
+		chats.GET("/ws", h.WebSocketHandler)
 	}
 }

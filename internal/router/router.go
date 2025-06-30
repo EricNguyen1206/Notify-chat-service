@@ -46,8 +46,8 @@ func NewApp() (*App, error) {
 
 	// Service
 	userService := service.NewUserService(userRepo, config.App.JWTSecret, redisClient)
-	friendService := service.NewFriendService(friendRepo)
-	channelService := service.NewChannelService(channelRepo, userRepo, redisClient)
+	friendService := service.NewFriendService(*friendRepo)
+	channelService := service.NewChannelService(channelRepo)
 	serverService := service.NewServerService(serverRepo)
 
 	// Handler
