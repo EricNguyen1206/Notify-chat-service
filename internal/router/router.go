@@ -2,15 +2,16 @@ package router
 
 import (
 	"chat-service/configs"
-	"chat-service/configs/database"
 	"chat-service/configs/middleware"
 	"chat-service/internal/handler"
 	"chat-service/internal/repository"
 	"chat-service/internal/service"
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 	"gorm.io/gorm"
 )
 
@@ -18,17 +19,16 @@ type App struct {
 	router     *gin.Engine
 	postgresDB *gorm.DB
 	// mongoDB      *database.MongoDB
-	// websocketHub *ws.Hub
+	WSUpgrader websocket.Upgrader
 }
+
+var (
+	configInstance *App
+	once           sync.Once
+)
 
 func NewApp() (*App, error) {
 	config := configs.Load()
-	// Initialize databases
-	postgresDB, err := database.NewPostgresConnection()
-	if err != nil {
-		return nil, err
-	}
-	redisClient, _ := database.InitRedis()
 
 	// mongoDB, err := database.NewMongoConnection()
 	// if err != nil {
@@ -39,19 +39,19 @@ func NewApp() (*App, error) {
 	// hub := ws.NewHub()
 
 	// Repository
-	userRepo := repository.NewUserRepository(postgresDB)
-	friendRepo := repository.NewFriendRepository(postgresDB, redisClient)
-	channelRepo := repository.NewChannelRepository(postgresDB)
-	serverRepo := repository.NewServerRepository(postgresDB)
+	userRepo := repository.NewUserRepository(config.DB)
+	friendRepo := repository.NewFriendRepository(config.DB, config.Redis)
+	channelRepo := repository.NewChannelRepository(config.DB)
+	serverRepo := repository.NewServerRepository(config.DB)
 
 	// Service
-	userService := service.NewUserService(userRepo, config.App.JWTSecret, redisClient)
+	userService := service.NewUserService(userRepo, config.JWTSecret, config.Redis)
 	friendService := service.NewFriendService(*friendRepo)
 	channelService := service.NewChannelService(channelRepo)
 	serverService := service.NewServerService(serverRepo)
 
 	// Handler
-	userHandler := handler.NewUserHandler(userService, redisClient)
+	userHandler := handler.NewUserHandler(userService, config.Redis)
 	friendHandler := handler.NewFriendHandler(friendService)
 	channelHandler := handler.NewChannelHandler(channelService)
 	serverHandler := handler.NewServerHandler(serverService)
@@ -97,9 +97,9 @@ func NewApp() (*App, error) {
 
 	return &App{
 		router:     router,
-		postgresDB: postgresDB,
+		postgresDB: config.DB,
 		// mongoDB:      mongoDB,
-		// websocketHub: hub,
+		WSUpgrader: config.WSUpgrader,
 	}, nil
 }
 

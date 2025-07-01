@@ -1,88 +1,41 @@
 package handler
 
-// import (
-// 	"encoding/json"
-// 	"fmt"
-// 	"net/http"
-// 	"strconv"
-// 	"time"
+import (
+	"chat-service/configs"
+	"chat-service/configs/utils"
+	"chat-service/configs/utils/ws"
+	"log"
 
-// 	"chat-service/configs/utils/ws"
+	"github.com/gin-gonic/gin"
+)
 
-// 	"github.com/gin-gonic/gin"
-// 	"github.com/gorilla/websocket"
-// )
+type WSHandler struct {
+	hub *ws.Hub
+}
 
-// var upgrader = websocket.Upgrader{
-// 	CheckOrigin: func(r *http.Request) bool { return true },
-// }
+func NewWSHandler(hub *ws.Hub) *WSHandler {
+	return &WSHandler{hub: hub}
+}
 
-// func HandleWebSocket(c *gin.Context) {
-// 	// Get user ID from query parameter
-// 	userIDStr := c.Query("userId")
-// 	userID, err := strconv.ParseUint(userIDStr, 10, 32)
-// 	if err != nil {
-// 		c.JSON(400, gin.H{"error": fmt.Sprintf("Invalid user ID: %v", err)})
-// 		return
-// 	}
-// 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
-// 	if err != nil {
-// 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Failed to upgrade to WebSocket"})
-// 		return
-// 	}
+func (h *WSHandler) HandleWebSocket(c *gin.Context) {
+	userID, err := utils.StringToUint(c.GetString("userID"))
 
-// 	client := &ws.Client{
-// 		UserID: uint(userID),
-// 		Conn:   conn,
-// 		Send:   make(chan []byte, 256),
-// 	}
+	// Nâng cấp kết nối lên WebSocket
+	conn, err := configs.ConfigInstance.WSUpgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		log.Printf("WebSocket upgrade failed: %v", err)
+		return
+	}
 
-// 	ws.ChatHub.RegisterClient(client)
+	// Tạo client mới
+	client := &ws.Client{
+		ID:   userID,
+		Conn: conn,
+	}
 
-// 	go writePump(client)
-// 	readPump(client)
-// }
+	// Đăng ký client với hub
+	h.hub.Register <- client
 
-// func readPump(client *ws.Client) {
-// 	defer func() {
-// 		ws.ChatHub.UnregisterClient(client)
-// 		client.Conn.Close()
-// 	}()
-
-// 	for {
-// 		_, msg, err := client.Conn.ReadMessage()
-// 		if err != nil {
-// 			break
-// 		}
-
-// 		var parsed struct {
-// 			To      uint   `json:"to"`
-// 			Content string `json:"content"`
-// 		}
-// 		if err := json.Unmarshal(msg, &parsed); err != nil {
-// 			continue
-// 		}
-
-// 		ws.ChatHub.SendDirectMessage(ws.DirectMessage{
-// 			FromUserID: client.UserID,
-// 			ToUserID:   parsed.To,
-// 			Content:    parsed.Content,
-// 			Timestamp:  time.Now().UTC(),
-// 		})
-// 	}
-// }
-
-// func writePump(client *ws.Client) {
-// 	defer client.Conn.Close()
-
-// 	for {
-// 		select {
-// 		case msg, ok := <-client.Send:
-// 			if !ok {
-// 				client.Conn.WriteMessage(websocket.CloseMessage, []byte{})
-// 				return
-// 			}
-// 			client.Conn.WriteMessage(websocket.TextMessage, msg)
-// 		}
-// 	}
-// }
+	// Bắt đầu xử lý message từ client
+	go client.HandleIncomingMessages(h.hub)
+}
