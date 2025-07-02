@@ -17,7 +17,7 @@ var (
 type ServerService interface {
 	CreateServer(ctx context.Context, ownerID uint, req *models.CreateServerRequest) (*models.ServerResponse, error)
 	GetServer(ctx context.Context, id uint) (*models.ServerResponse, error)
-	GetUserServers(ctx context.Context, userID uint) ([]*models.ServerResponse, error)
+	GetUserServers(userID uint) ([]*models.ServerResponse, error)
 	UpdateServer(ctx context.Context, id uint, ownerID uint, req *models.UpdateServerRequest) (*models.ServerResponse, error)
 	DeleteServer(ctx context.Context, id uint, ownerID uint) error
 	JoinServer(ctx context.Context, userID uint, req *models.JoinServerRequest) error
@@ -64,7 +64,7 @@ func (s *serverService) CreateServer(ctx context.Context, ownerID uint, req *mod
 }
 
 func (s *serverService) GetServer(ctx context.Context, id uint) (*models.ServerResponse, error) {
-	server, err := s.repo.FindByID(ctx, id)
+	server, err := s.repo.FindByID(id)
 	if err != nil {
 		return nil, ErrServerNotFound
 	}
@@ -93,33 +93,33 @@ func (s *serverService) GetServer(ctx context.Context, id uint) (*models.ServerR
 	}, nil
 }
 
-func (s *serverService) GetUserServers(ctx context.Context, userID uint) ([]*models.ServerResponse, error) {
-	// joins, err := s.repo.GetUserServers(ctx, userID)
-	// if err != nil {
-	// 	return nil, err
-	// }
+func (s *serverService) GetUserServers(userID uint) ([]*models.ServerResponse, error) {
+	joins, err := s.repo.GetUserServers(userID)
+	if err != nil {
+		return nil, err
+	}
 
 	var servers []*models.ServerResponse
-	// for _, join := range joins {
-	// 	server, err := s.repo.FindByID(ctx, join.ServerID)
-	// 	if err != nil {
-	// 		continue
-	// 	}
+	for _, join := range joins {
+		server, err := s.repo.FindByID(join.ServerID)
+		if err != nil {
+			continue
+		}
 
-	// 	servers = append(servers, &models.ServerResponse{
-	// 		ID:      server.ID,
-	// 		Name:    server.Name,
-	// 		Owner:   server.Owner,
-	// 		Avatar:  server.Avatar,
-	// 		Created: server.Created,
-	// 	})
-	// }
+		servers = append(servers, &models.ServerResponse{
+			ID:        server.ID,
+			Name:      server.Name,
+			OwnerId:   server.OwnerId,
+			Avatar:    server.Avatar,
+			CreatedAt: server.CreatedAt,
+		})
+	}
 
 	return servers, nil
 }
 
 func (s *serverService) UpdateServer(ctx context.Context, id uint, ownerID uint, req *models.UpdateServerRequest) (*models.ServerResponse, error) {
-	server, err := s.repo.FindByID(ctx, id)
+	server, err := s.repo.FindByID(id)
 	if err != nil {
 		return nil, ErrServerNotFound
 	}
@@ -146,7 +146,7 @@ func (s *serverService) UpdateServer(ctx context.Context, id uint, ownerID uint,
 }
 
 func (s *serverService) DeleteServer(ctx context.Context, id uint, ownerID uint) error {
-	server, err := s.repo.FindByID(ctx, id)
+	server, err := s.repo.FindByID(id)
 	if err != nil {
 		return ErrServerNotFound
 	}
@@ -160,7 +160,7 @@ func (s *serverService) DeleteServer(ctx context.Context, id uint, ownerID uint)
 
 func (s *serverService) JoinServer(ctx context.Context, userID uint, req *models.JoinServerRequest) error {
 	// Check if server exists
-	_, err := s.repo.FindByID(ctx, req.ServerID)
+	_, err := s.repo.FindByID(req.ServerID)
 	if err != nil {
 		return ErrServerNotFound
 	}
@@ -185,7 +185,7 @@ func (s *serverService) JoinServer(ctx context.Context, userID uint, req *models
 
 func (s *serverService) LeaveServer(ctx context.Context, serverID uint, userID uint) error {
 	// Check if server exists
-	server, err := s.repo.FindByID(ctx, serverID)
+	server, err := s.repo.FindByID(serverID)
 	if err != nil {
 		return ErrServerNotFound
 	}

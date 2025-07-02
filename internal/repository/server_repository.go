@@ -9,14 +9,14 @@ import (
 
 type ServerRepository interface {
 	Create(ctx context.Context, server *models.Server) error
-	FindByID(ctx context.Context, id uint) (*models.Server, error)
+	FindByID(id uint) (*models.Server, error)
 	FindByOwner(ctx context.Context, ownerID uint) ([]*models.Server, error)
 	Update(ctx context.Context, server *models.Server) error
 	Delete(ctx context.Context, id uint) error
 	JoinServer(ctx context.Context, join *models.ServerMembers) error
 	LeaveServer(ctx context.Context, serverID, userID uint) error
 	GetServerMembers(ctx context.Context, serverID uint) ([]*models.ServerMembers, error)
-	GetUserServers(ctx context.Context, userID uint) ([]*models.ServerMembers, error)
+	GetUserServers(userID uint) ([]*models.ServerMembers, error)
 	IsMember(ctx context.Context, serverID, userID uint) (bool, error)
 }
 
@@ -32,9 +32,9 @@ func (r *serverRepository) Create(ctx context.Context, server *models.Server) er
 	return r.db.WithContext(ctx).Create(server).Error
 }
 
-func (r *serverRepository) FindByID(ctx context.Context, id uint) (*models.Server, error) {
+func (r *serverRepository) FindByID(id uint) (*models.Server, error) {
 	var server models.Server
-	err := r.db.WithContext(ctx).First(&server, "id = ?", id).Error
+	err := r.db.First(&server, "id = ?", id).Error
 	return &server, err
 }
 
@@ -70,9 +70,9 @@ func (r *serverRepository) GetServerMembers(ctx context.Context, serverID uint) 
 	return members, err
 }
 
-func (r *serverRepository) GetUserServers(ctx context.Context, userID uint) ([]*models.ServerMembers, error) {
+func (r *serverRepository) GetUserServers(userID uint) ([]*models.ServerMembers, error) {
 	var servers []*models.ServerMembers
-	err := r.db.WithContext(ctx).
+	err := r.db.
 		Where("user_id = ?", userID).
 		Find(&servers).Error
 	return servers, err

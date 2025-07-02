@@ -64,7 +64,7 @@ func (h *ServerHandler) GetUserServers(c *gin.Context) {
 		return
 	}
 
-	servers, err := h.serverService.GetUserServers(c.Request.Context(), userID)
+	servers, err := h.serverService.GetUserServers(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -18,14 +18,15 @@ func NewWSHandler(hub *ws.Hub) *WSHandler {
 }
 
 func (h *WSHandler) HandleWebSocket(c *gin.Context) {
-	userID, err := utils.StringToUint(c.GetString("userID"))
+	userID, _ := utils.StringToUint(c.GetString("userID"))
 
 	// Nâng cấp kết nối lên WebSocket
 	conn, err := configs.ConfigInstance.WSUpgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		log.Printf("WebSocket upgrade failed: %v", err)
+		log.Printf("🔴 WebSocket upgrade failed: %v", err)
 		return
 	}
+	log.Printf("✅ WebSocket upgrade success")
 
 	// Tạo client mới
 	client := &ws.Client{

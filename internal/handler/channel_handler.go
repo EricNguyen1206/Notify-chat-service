@@ -24,10 +24,12 @@ func (h *ChannelHandler) RegisterRoutes(r *gin.RouterGroup) {
 	{
 		channels.Use(middleware.Auth())
 		channels.POST("/", h.CreateChannel)
+		// Route for getting channels by server and user - must come before /:id routes
+		channels.GET("/server/:serverId/user/:userId", h.GetChannelsByUserAndServer)
+		// Individual channel routes with :id parameter
 		channels.PUT("/:id", h.UpdateChannel)
 		channels.DELETE("/:id", h.DeleteChannel)
 		channels.GET("/:id", h.GetChannelByID)
-		channels.GET("/:serverId/user/:userId", h.GetChannelsByUserAndServer)
 		channels.POST("/:id/join", h.JoinChannel)
 		channels.POST("/:id/leave", h.LeaveChannel)
 		channels.DELETE("/:id/remove/:userId", h.RemoveUserFromChannel)

@@ -57,14 +57,14 @@ func (h *Hub) Run() {
 			h.mu.Lock()
 			h.Clients[client] = true
 			h.mu.Unlock()
-			log.Printf("Client registered: %s", client.ID)
+			log.Printf("Client registered: %d", client.ID)
 
 		case client := <-h.Unregister:
 			h.mu.Lock()
 			if _, ok := h.Clients[client]; ok {
 				delete(h.Clients, client)
 				client.Conn.Close()
-				log.Printf("Client unregistered: %s", client.ID)
+				log.Printf("Client unregistered: %d", client.ID)
 			}
 			h.mu.Unlock()
 
@@ -155,11 +155,11 @@ func (c *Client) HandleIncomingMessages(hub *Hub) {
 		switch msgData.Action {
 		case "join":
 			c.AddChannel(msgData.ChannelID)
-			log.Printf("Client %s joined channel %s", c.ID, msgData.ChannelID)
+			log.Printf("Client %d joined channel %s", c.ID, msgData.ChannelID)
 
 		case "leave":
 			c.RemoveChannel(msgData.ChannelID)
-			log.Printf("Client %s left channel %s", c.ID, msgData.ChannelID)
+			log.Printf("Client %d left channel %s", c.ID, msgData.ChannelID)
 
 		case "message":
 			// Tạo message để broadcast
