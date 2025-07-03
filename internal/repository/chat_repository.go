@@ -39,12 +39,6 @@ func (r *ChatRepository) FindByUserID(userID uint) ([]*models.Chat, error) {
 	return chats, err
 }
 
-func (r *ChatRepository) FindByServerID(serverID uint) ([]*models.Chat, error) {
-	var chats []*models.Chat
-	err := r.db.Where("server_id = ?", serverID).Find(&chats).Error
-	return chats, err
-}
-
 func (r *ChatRepository) FindByChannelID(channelID uint) ([]*models.Chat, error) {
 	var chats []*models.Chat
 	err := r.db.Where("channel_id = ?", channelID).Find(&chats).Error

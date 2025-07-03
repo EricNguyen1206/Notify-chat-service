@@ -17,7 +17,6 @@ type User struct {
 	Friends        []FriendShip `gorm:"foreignKey:UserID;references:ID"`
 	FriendRequests []FriendShip `gorm:"foreignKey:FriendID;references:ID"`
 	Channels       []*Channel   `gorm:"many2many:channel_members"`
-	Servers        []*Server    `gorm:"many2many:server_members"`
 	// Chats          []Chat          `gorm:"foreignKey:UserID;references:ID"`
 }
 

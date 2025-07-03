@@ -4,7 +4,6 @@ import (
 	"chat-service/configs/middleware"
 	"chat-service/internal/models"
 	"chat-service/internal/service"
-	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -54,7 +53,6 @@ func (h *UserHandler) Login(c *gin.Context) {
 
 func (h *UserHandler) GetProfile(c *gin.Context) {
 	userID, exists := c.Get("user_id")
-	log.Printf("TEST user ID: ", userID)
 	getError := c.GetString("error")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": getError})
@@ -62,7 +60,6 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 	}
 	userIDUint, ok := userID.(uint)
 	if !ok {
-		log.Printf("TEST Invalid user ID type in context: %T", userID)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "invalid user ID type",
 			"details": "user_id in context is not of type uint",

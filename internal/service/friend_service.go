@@ -8,11 +8,11 @@ import (
 )
 
 type FriendService struct {
-	friendRepo repository.FriendRepository
+	friendRepo *repository.FriendRepository
 }
 
-func NewFriendService(friendRepo repository.FriendRepository) *FriendService {
-	return &FriendService{friendRepo: friendRepo}
+func NewFriendService(friendRepo *repository.FriendRepository) *FriendService {
+	return &FriendService{friendRepo}
 }
 
 func (s *FriendService) AddFriend(userID, friendID uint) error {

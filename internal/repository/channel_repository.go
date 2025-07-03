@@ -26,19 +26,16 @@ func (r *ChannelRepository) Delete(channelID uint) error {
 	return r.db.Delete(&models.Channel{}, channelID).Error
 }
 
-func (r *ChannelRepository) GetByID(channelID uint) (*models.Channel, error) {
-	var c models.Channel
-	err := r.db.Preload("Members").Preload("Server").First(&c, channelID).Error
-	return &c, err
+func (r *ChannelRepository) GetAllChannels() ([]models.Channel, error) {
+	var c []models.Channel
+	err := r.db.Find(&c).Error
+	return c, err
 }
 
-func (r *ChannelRepository) GetListByUserAndServer(userID uint, serverID uint) ([]models.Channel, error) {
-	var channels []models.Channel
-	err := r.db.
-		Joins("JOIN channel_members cm ON cm.channel_id = channels.id").
-		Where("cm.user_id = ? AND channels.server_id = ?", userID, serverID).
-		Find(&channels).Error
-	return channels, err
+func (r *ChannelRepository) GetByID(channelID uint) (*models.Channel, error) {
+	var c models.Channel
+	err := r.db.Preload("Members").First(&c, channelID).Error
+	return &c, err
 }
 
 func (r *ChannelRepository) AddUser(channelID uint, userID uint) error {

@@ -9,12 +9,10 @@ import (
 // Channel represents a channel within a category
 type Channel struct {
 	gorm.Model
-	Name     string `gorm:"not null" json:"name"`
-	OwnerID  uint   `gorm:"not null;type:uint" json:"ownerId"` // userid
-	ServerID uint   `gorm:"not null;type:uint" json:"serverId"`
+	Name    string `gorm:"not null" json:"name"`
+	OwnerID uint   `gorm:"not null;type:uint" json:"ownerId"` // userid
 
 	Members []*User `gorm:"many2many:channel_members"`
-	Server  *Server `gorm:"foreignKey:ServerID"`
 }
 
 type UpdateChannelRequest struct {
@@ -24,7 +22,6 @@ type UpdateChannelRequest struct {
 
 type ChannelResponse struct {
 	ID        uint      `json:"id"`
-	ServerID  uint      `json:"serverId"`
 	Name      string    `json:"name"`
 	Type      string    `json:"type"`
 	CreatedAt time.Time `json:"createdAt"`

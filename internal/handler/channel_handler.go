@@ -23,9 +23,8 @@ func (h *ChannelHandler) RegisterRoutes(r *gin.RouterGroup) {
 	channels := r.Group("/channels")
 	{
 		channels.Use(middleware.Auth())
+		channels.GET("/", h.GetAllChannels)
 		channels.POST("/", h.CreateChannel)
-		// Route for getting channels by server and user - must come before /:id routes
-		channels.GET("/server/:serverId/user/:userId", h.GetChannelsByUserAndServer)
 		// Individual channel routes with :id parameter
 		channels.PUT("/:id", h.UpdateChannel)
 		channels.DELETE("/:id", h.DeleteChannel)
@@ -37,17 +36,25 @@ func (h *ChannelHandler) RegisterRoutes(r *gin.RouterGroup) {
 	}
 }
 
+func (h *ChannelHandler) GetAllChannels(c *gin.Context) {
+	channels, err := h.channelService.GetAllChannel()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get channel"})
+		return
+	}
+	c.JSON(http.StatusOK, channels)
+}
+
 func (h *ChannelHandler) CreateChannel(c *gin.Context) {
 	var req struct {
-		Name     string `json:"name"`
-		OwnerID  uint   `json:"ownerId"`
-		ServerID uint   `json:"serverId"`
+		Name    string `json:"name"`
+		OwnerID uint   `json:"ownerId"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	channel, err := h.channelService.CreateChannel(req.Name, req.OwnerID, req.ServerID)
+	channel, err := h.channelService.CreateChannel(req.Name, req.OwnerID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create channel"})
 		return
@@ -89,18 +96,6 @@ func (h *ChannelHandler) GetChannelByID(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, channel)
-}
-
-func (h *ChannelHandler) GetChannelsByUserAndServer(c *gin.Context) {
-	serverID, _ := strconv.ParseUint(c.Param("serverId"), 10, 64)
-	userID, _ := strconv.ParseUint(c.Param("userId"), 10, 64)
-
-	channels, err := h.channelService.GetChannelsByUserAndServer(uint(userID), uint(serverID))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch channels"})
-		return
-	}
-	c.JSON(http.StatusOK, channels)
 }
 
 func (h *ChannelHandler) JoinChannel(c *gin.Context) {

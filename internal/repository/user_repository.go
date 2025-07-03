@@ -11,23 +11,23 @@ import (
 	"gorm.io/gorm"
 )
 
-type UserRepository interface {
-	Create(ctx context.Context, user *models.User) error
-	FindByEmail(ctx context.Context, email string) (*models.User, error)
-	FindByID(ctx context.Context, userId uint) (*models.User, error)
-	Update(ctx context.Context, user *models.User) error
-	Delete(ctx context.Context, userId uint) error
-}
+// type UserRepository interface {
+// 	Create(ctx context.Context, user *models.User) error
+// 	FindByEmail(ctx context.Context, email string) (*models.User, error)
+// 	FindByID(ctx context.Context, userId uint) (*models.User, error)
+// 	Update(ctx context.Context, user *models.User) error
+// 	Delete(ctx context.Context, userId uint) error
+// }
 
-type userRepository struct {
+type UserRepository struct {
 	db *gorm.DB
 }
 
-func NewUserRepository(db *gorm.DB) UserRepository {
-	return &userRepository{db: db}
+func NewUserRepository(db *gorm.DB) *UserRepository {
+	return &UserRepository{db: db}
 }
 
-func (r *userRepository) Create(ctx context.Context, user *models.User) error {
+func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 	// Begin transaction
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		// Check email exist
@@ -49,7 +49,7 @@ func (r *userRepository) Create(ctx context.Context, user *models.User) error {
 	})
 }
 
-func (r *userRepository) FindByEmail(ctx context.Context, email string) (*models.User, error) {
+func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*models.User, error) {
 	var user models.User
 	err := r.db.Where("email = ? AND deleted_at IS NULL", email).First(&user).Error
 	if err != nil {
@@ -58,7 +58,7 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*models
 	return &user, nil
 }
 
-func (r *userRepository) FindByID(ctx context.Context, id uint) (*models.User, error) {
+func (r *UserRepository) FindByID(id uint) (*models.User, error) {
 	var user models.User
 	err := r.db.Where("id = ? AND deleted_at IS NULL", id).First(&user).Error
 	if err != nil {
@@ -70,7 +70,7 @@ func (r *userRepository) FindByID(ctx context.Context, id uint) (*models.User, e
 	return &user, nil
 }
 
-func (r *userRepository) Update(ctx context.Context, user *models.User) error {
+func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
 	// Get raw database connection
 	sqlDB, err := r.db.DB()
 	if err != nil {
@@ -122,7 +122,7 @@ func (r *userRepository) Update(ctx context.Context, user *models.User) error {
 	return nil
 }
 
-func (r *userRepository) Delete(ctx context.Context, userId uint) error {
+func (r *UserRepository) Delete(ctx context.Context, userId uint) error {
 	// Get raw database connection
 	sqlDB, err := r.db.DB()
 	if err != nil {

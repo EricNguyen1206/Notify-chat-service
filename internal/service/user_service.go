@@ -33,12 +33,12 @@ type UserService interface {
 }
 
 type userService struct {
-	repo        repository.UserRepository
+	repo        *repository.UserRepository
 	jwtSecret   string
 	redisClient *redis.Client
 }
 
-func NewUserService(repo repository.UserRepository, jwtSecret string, redisClient *redis.Client) UserService {
+func NewUserService(repo *repository.UserRepository, jwtSecret string, redisClient *redis.Client) UserService {
 	return &userService{
 		repo:        repo,
 		jwtSecret:   jwtSecret,
@@ -111,7 +111,7 @@ func (s *userService) Login(ctx context.Context, req *models.LoginRequest) (stri
 }
 
 func (s *userService) GetProfile(ctx context.Context, userID uint) (*models.UserResponse, error) {
-	user, err := s.repo.FindByID(ctx, userID)
+	user, err := s.repo.FindByID(userID)
 	if err != nil {
 		return nil, ErrUserNotFound
 	}
@@ -125,7 +125,7 @@ func (s *userService) GetProfile(ctx context.Context, userID uint) (*models.User
 }
 
 func (s *userService) UpdateProfile(ctx context.Context, userID uint, req *models.RegisterRequest) (*models.UserResponse, error) {
-	user, err := s.repo.FindByID(ctx, userID)
+	user, err := s.repo.FindByID(userID)
 	if err != nil {
 		return nil, ErrUserNotFound
 	}

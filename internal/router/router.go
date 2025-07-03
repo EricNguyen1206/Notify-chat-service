@@ -6,9 +6,7 @@ import (
 	"chat-service/internal/handler"
 	"chat-service/internal/repository"
 	"chat-service/internal/service"
-	"fmt"
 	"log"
-	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -22,60 +20,30 @@ type App struct {
 	WSUpgrader websocket.Upgrader
 }
 
-var (
-	configInstance *App
-	once           sync.Once
-)
-
 func NewApp() (*App, error) {
 	config := configs.Load()
-
-	// mongoDB, err := database.NewMongoConnection()
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// Initialize WebSocket hub
-	// hub := ws.NewHub()
 
 	// Repository
 	userRepo := repository.NewUserRepository(config.DB)
 	friendRepo := repository.NewFriendRepository(config.DB, config.Redis)
 	channelRepo := repository.NewChannelRepository(config.DB)
-	serverRepo := repository.NewServerRepository(config.DB)
 
 	// Service
 	userService := service.NewUserService(userRepo, config.JWTSecret, config.Redis)
-	friendService := service.NewFriendService(*friendRepo)
-	channelService := service.NewChannelService(channelRepo)
-	serverService := service.NewServerService(serverRepo)
+	friendService := service.NewFriendService(friendRepo)
+	channelService := service.NewChannelService(channelRepo, userRepo)
 
 	// Handler
 	userHandler := handler.NewUserHandler(userService, config.Redis)
 	friendHandler := handler.NewFriendHandler(friendService)
 	channelHandler := handler.NewChannelHandler(channelService)
-	serverHandler := handler.NewServerHandler(serverService)
 
 	// Setup router
 	router := gin.Default()
 
-	// Add CORS middleware
+	// Add middlewares
 	router.Use(middleware.CORS())
-
-	// Add logging middleware
-	router.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
-		return fmt.Sprintf("[%s] | %s | %d | %s | %s | %s | %s | %s | %s\n",
-			param.TimeStamp.Format("2006-01-02 15:04:05"),
-			param.ClientIP,
-			param.StatusCode,
-			param.Method,
-			param.Path,
-			param.Request.UserAgent(),
-			param.ErrorMessage,
-			param.Latency,
-			param.Request.Proto,
-		)
-	}))
+	router.Use(middleware.LogApi())
 
 	// WebSocket routes
 	// router.GET("/ws", handler.HandleWebSocket)
@@ -92,7 +60,6 @@ func NewApp() (*App, error) {
 		userHandler.RegisterRoutes(api)
 		friendHandler.RegisterRoutes(api)
 		channelHandler.RegisterRoutes(api)
-		serverHandler.RegisterRoutes(api)
 	}
 
 	return &App{

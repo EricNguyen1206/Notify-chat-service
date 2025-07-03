@@ -3,26 +3,38 @@ package service
 import (
 	"chat-service/internal/models"
 	"chat-service/internal/repository"
+	"errors"
 
 	"gorm.io/gorm"
 )
 
 type ChannelService struct {
-	repo *repository.ChannelRepository
+	repo     *repository.ChannelRepository
+	userRepo *repository.UserRepository
 }
 
-func NewChannelService(repo *repository.ChannelRepository) *ChannelService {
-	return &ChannelService{repo}
+func NewChannelService(repo *repository.ChannelRepository, userRepo *repository.UserRepository) *ChannelService {
+	return &ChannelService{repo, userRepo}
 }
 
-func (s *ChannelService) CreateChannel(name string, ownerID, serverID uint) (*models.Channel, error) {
-	channel := &models.Channel{
-		Name:     name,
-		OwnerID:  ownerID,
-		ServerID: serverID,
-		Members:  []*models.User{{Model: gorm.Model{ID: ownerID}}}, // Auto join
+func (s *ChannelService) GetAllChannel() ([]models.Channel, error) {
+	return s.repo.GetAllChannels()
+}
+
+func (s *ChannelService) CreateChannel(name string, ownerID uint) (*models.Channel, error) {
+	owner, err := s.userRepo.FindByID(ownerID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("owner not found")
+		}
+		return nil, errors.New("failed to find owner: " + err.Error())
 	}
-	err := s.repo.Create(channel)
+	channel := &models.Channel{
+		Name:    name,
+		OwnerID: ownerID,
+		Members: []*models.User{owner},
+	}
+	err = s.repo.Create(channel)
 	return channel, err
 }
 
@@ -41,10 +53,6 @@ func (s *ChannelService) DeleteChannel(channelID uint) error {
 
 func (s *ChannelService) GetChannelByID(channelID uint) (*models.Channel, error) {
 	return s.repo.GetByID(channelID)
-}
-
-func (s *ChannelService) GetChannelsByUserAndServer(userID, serverID uint) ([]models.Channel, error) {
-	return s.repo.GetListByUserAndServer(userID, serverID)
 }
 
 func (s *ChannelService) JoinChannel(channelID, userID uint) error {

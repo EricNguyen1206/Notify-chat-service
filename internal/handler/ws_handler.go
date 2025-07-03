@@ -34,9 +34,9 @@ func (h *WSHandler) HandleWebSocket(c *gin.Context) {
 		Conn: conn,
 	}
 
-	// Đăng ký client với hub
+	// Regist client to hub
 	h.hub.Register <- client
 
-	// Bắt đầu xử lý message từ client
+	// Start handle message
 	go client.HandleIncomingMessages(h.hub)
 }
