@@ -19,13 +19,6 @@ type User struct {
 	Channels       []*Channel   `gorm:"many2many:channel_members" json:"channels"`
 }
 
-func (u *User) BeforeCreate(tx *gorm.DB) error {
-	// if u.Role == "" {
-	// 	u.Role = "user" // Set default role is user
-	// }
-	return nil
-}
-
 /** -------------------- DTOs -------------------- */
 // Request
 type RegisterRequest struct {
@@ -45,23 +38,4 @@ type UserResponse struct {
 	Email     string    `json:"email"`
 	Username  string    `json:"username"`
 	CreatedAt time.Time `json:"created_at"`
-}
-
-// User Status
-type UserStatus string
-
-const (
-	UserStatusOnline  UserStatus = "online"
-	UserStatusOffline UserStatus = "offline"
-)
-
-type StatusUpdate struct {
-	UserID uint       `json:"user_id"`
-	Status UserStatus `json:"status"`
-	Time   time.Time  `json:"time"`
-}
-
-type OnlineUser struct {
-	UserID   uint      `json:"user_id"`
-	LastSeen time.Time `json:"last_seen"`
 }

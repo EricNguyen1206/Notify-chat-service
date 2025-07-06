@@ -33,5 +33,9 @@ main
 .DS_Store
 
 # Node modules
-*/node_modules
+node_modules/
+
+# Test case
+*/test
+test/
 
