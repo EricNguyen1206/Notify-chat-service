@@ -17,13 +17,3 @@ func StringToUint(s string) (uint, error) {
 
 	return uint(val), nil
 }
-
-// StringToUintWithDefault converts string to uint with a default value
-// Returns the default value if conversion fails
-func StringToUintWithDefault(s string, defaultVal uint) uint {
-	result, err := StringToUint(s)
-	if err != nil {
-		return defaultVal
-	}
-	return result
-}

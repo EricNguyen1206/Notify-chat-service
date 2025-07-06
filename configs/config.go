@@ -23,38 +23,6 @@ type Config struct {
 	Redis      *redis.Client
 	WSUpgrader websocket.Upgrader
 	WSHub      *ws.Hub
-
-	// // Redis
-	// Redis struct {
-	// 	Host     string
-	// 	Port     string
-	// 	Password string
-	// 	Addr     string
-	// }
-
-	// // Postgrest
-	// Postgres struct {
-	// 	User     string
-	// 	Password string
-	// 	Host     string
-	// 	Port     string
-	// 	DbName   string
-	// }
-
-	// MinIO
-	// MinIO struct {
-	// 	Endpoint string
-	// 	User     string
-	// 	Password string
-	// 	UseSSL   bool
-	// 	Bucket   string
-	// }
-
-	// Kafka
-	// Kafka struct {
-	// 	Brokers []string
-	// 	Topic   string
-	// }
 }
 
 var (

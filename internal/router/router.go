@@ -16,7 +16,6 @@ import (
 type App struct {
 	router     *gin.Engine
 	postgresDB *gorm.DB
-	// mongoDB      *database.MongoDB
 	WSUpgrader websocket.Upgrader
 }
 
@@ -66,7 +65,6 @@ func NewApp() (*App, error) {
 	return &App{
 		router:     router,
 		postgresDB: config.DB,
-		// mongoDB:      mongoDB,
 		WSUpgrader: config.WSUpgrader,
 	}, nil
 }
