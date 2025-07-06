@@ -25,6 +25,16 @@ func (h *WSHandler) RegisterRoutes(r *gin.RouterGroup) {
 	}
 }
 
+// HandleWebSocket godoc
+// @Summary WebSocket connection
+// @Description Establish a WebSocket connection for real-time messaging
+// @Tags websocket
+// @Accept json
+// @Produce json
+// @Param userId query string true "User ID for WebSocket connection"
+// @Success 101 "Switching Protocols - WebSocket connection established"
+// @Failure 400 {object} map[string]interface{} "Bad request - missing or invalid userId parameter"
+// @Router /ws [get]
 func (h *WSHandler) HandleWebSocket(c *gin.Context) {
 	// Get userId from query parameters: /api/ws?userId=1
 	userIDStr := c.Query("userId")

@@ -19,6 +19,17 @@ func NewUserHandler(userService service.UserService, redisClient *redis.Client) 
 	return &UserHandler{userService: userService, redisClient: redisClient}
 }
 
+// Register godoc
+// @Summary Register a new user
+// @Description Register a new user with username, email, and password
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body models.RegisterRequest true "User registration data"
+// @Success 201 {object} models.UserResponse "User created successfully"
+// @Failure 400 {object} map[string]interface{} "Bad request - invalid input data"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /auth/register [post]
 func (h *UserHandler) Register(c *gin.Context) {
 	var req models.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -35,6 +46,18 @@ func (h *UserHandler) Register(c *gin.Context) {
 	c.JSON(http.StatusCreated, user)
 }
 
+// Login godoc
+// @Summary User login
+// @Description Authenticate user with email and password
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body models.LoginRequest true "User login credentials"
+// @Success 200 {object} map[string]string "Login successful - returns JWT token"
+// @Failure 400 {object} map[string]interface{} "Bad request - invalid input data"
+// @Failure 401 {object} map[string]interface{} "Unauthorized - invalid credentials"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /auth/login [post]
 func (h *UserHandler) Login(c *gin.Context) {
 	var req models.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -51,6 +74,17 @@ func (h *UserHandler) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"token": token})
 }
 
+// GetProfile godoc
+// @Summary Get user profile
+// @Description Get the current user's profile information
+// @Tags users
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} models.UserResponse "User profile retrieved successfully"
+// @Failure 401 {object} map[string]interface{} "Unauthorized - invalid or missing token"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /users/profile [get]
 func (h *UserHandler) GetProfile(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	getError := c.GetString("error")
