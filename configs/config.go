@@ -2,6 +2,7 @@ package configs
 
 import (
 	"chat-service/configs/database"
+	"chat-service/configs/utils/ws"
 	"log"
 	"net/http"
 	"os"
@@ -21,6 +22,7 @@ type Config struct {
 	DB         *gorm.DB
 	Redis      *redis.Client
 	WSUpgrader websocket.Upgrader
+	WSHub      *ws.Hub
 
 	// // Redis
 	// Redis struct {
@@ -87,6 +89,8 @@ func Load() *Config {
 			// TODO: fix in production
 			CheckOrigin: func(r *http.Request) bool { return true },
 		}
+		wsHub := ws.WsNewHub(redisClient)
+
 		ConfigInstance = &Config{
 			Port:       appPort,
 			JWTSecret:  appJWTSecret,
@@ -94,6 +98,7 @@ func Load() *Config {
 			DB:         postgresDB,
 			Redis:      redisClient,
 			WSUpgrader: upgrader,
+			WSHub:      wsHub,
 		}
 	})
 	return ConfigInstance

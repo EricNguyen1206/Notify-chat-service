@@ -23,18 +23,41 @@ func (r *ChannelRepository) Update(channel *models.Channel) error {
 }
 
 func (r *ChannelRepository) Delete(channelID uint) error {
+	// First, clear the many-to-many association to ensure cascade deletion
+	err := r.db.Model(&models.Channel{Model: gorm.Model{ID: channelID}}).Association("Members").Clear()
+	if err != nil {
+		return err
+	}
+
+	// Then delete the channel
 	return r.db.Delete(&models.Channel{}, channelID).Error
 }
 
 func (r *ChannelRepository) GetAllChannels() ([]models.Channel, error) {
 	var c []models.Channel
-	err := r.db.Find(&c).Error
+	err := r.db.Preload("Members", func(db *gorm.DB) *gorm.DB {
+		return db.Select("id, username, email, created_at, updated_at, deleted_at")
+	}).Find(&c).Error
+	return c, err
+}
+
+func (r *ChannelRepository) GetAllUserChannels(userID uint) ([]models.Channel, error) {
+	var c []models.Channel
+	err := r.db.
+		Preload("Members", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id, username, email, created_at, updated_at, deleted_at")
+		}).
+		Joins("JOIN channel_members ON channels.id = channel_members.channel_id").
+		Where("channel_members.user_id = ?", userID).
+		Find(&c).Error
 	return c, err
 }
 
 func (r *ChannelRepository) GetByID(channelID uint) (*models.Channel, error) {
 	var c models.Channel
-	err := r.db.Preload("Members").First(&c, channelID).Error
+	err := r.db.Preload("Members", func(db *gorm.DB) *gorm.DB {
+		return db.Select("id, username, email, created_at, updated_at, deleted_at")
+	}).First(&c, channelID).Error
 	return &c, err
 }
 

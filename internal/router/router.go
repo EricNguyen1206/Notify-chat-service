@@ -38,15 +38,14 @@ func NewApp() (*App, error) {
 	friendHandler := handler.NewFriendHandler(friendService)
 	channelHandler := handler.NewChannelHandler(channelService)
 
+	wsHandler := handler.NewWSHandler(config.WSHub)
+
 	// Setup router
 	router := gin.Default()
 
 	// Add middlewares
 	router.Use(middleware.CORS())
 	router.Use(middleware.LogApi())
-
-	// WebSocket routes
-	// router.GET("/ws", handler.HandleWebSocket)
 
 	// Register API routes
 	api := router.Group("/api")
@@ -57,6 +56,8 @@ func NewApp() (*App, error) {
 			})
 		})
 
+		// WebSocket routes
+		wsHandler.RegisterRoutes(api)
 		userHandler.RegisterRoutes(api)
 		friendHandler.RegisterRoutes(api)
 		channelHandler.RegisterRoutes(api)

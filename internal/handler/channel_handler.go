@@ -23,21 +23,22 @@ func (h *ChannelHandler) RegisterRoutes(r *gin.RouterGroup) {
 	channels := r.Group("/channels")
 	{
 		channels.Use(middleware.Auth())
-		channels.GET("/", h.GetAllChannels)
+		channels.GET("/", h.GetUserChannels)
 		channels.POST("/", h.CreateChannel)
 		// Individual channel routes with :id parameter
+		channels.GET("/:id", h.GetChannelByID)
 		channels.PUT("/:id", h.UpdateChannel)
 		channels.DELETE("/:id", h.DeleteChannel)
-		channels.GET("/:id", h.GetChannelByID)
-		channels.POST("/:id/join", h.JoinChannel)
-		channels.POST("/:id/leave", h.LeaveChannel)
-		channels.DELETE("/:id/remove/:userId", h.RemoveUserFromChannel)
-		channels.GET("/:id/messages", h.GetMessagesByChannelID)
+		// user-channel relation logic
+		channels.POST("/:id/user", h.AddUserToChannel)
+		channels.PUT("/:id/user", h.LeaveChannel)
+		channels.DELETE("/:id/user", h.RemoveUserFromChannel)
 	}
 }
 
-func (h *ChannelHandler) GetAllChannels(c *gin.Context) {
-	channels, err := h.channelService.GetAllChannel()
+func (h *ChannelHandler) GetUserChannels(c *gin.Context) {
+	userID := c.MustGet("user_id").(uint)
+	channels, err := h.channelService.GetUserChannels(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get channel"})
 		return
@@ -46,15 +47,15 @@ func (h *ChannelHandler) GetAllChannels(c *gin.Context) {
 }
 
 func (h *ChannelHandler) CreateChannel(c *gin.Context) {
+	userID := c.MustGet("user_id").(uint)
 	var req struct {
-		Name    string `json:"name"`
-		OwnerID uint   `json:"ownerId"`
+		Name string `json:"name"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	channel, err := h.channelService.CreateChannel(req.Name, req.OwnerID)
+	channel, err := h.channelService.CreateChannel(req.Name, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create channel"})
 		return
@@ -80,9 +81,10 @@ func (h *ChannelHandler) UpdateChannel(c *gin.Context) {
 }
 
 func (h *ChannelHandler) DeleteChannel(c *gin.Context) {
+	userID := c.MustGet("user_id").(uint)
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err := h.channelService.DeleteChannel(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Delete failed"})
+	if err := h.channelService.DeleteChannel(userID, uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Channel deleted"})
@@ -98,33 +100,28 @@ func (h *ChannelHandler) GetChannelByID(c *gin.Context) {
 	c.JSON(http.StatusOK, channel)
 }
 
-func (h *ChannelHandler) JoinChannel(c *gin.Context) {
-	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
+func (h *ChannelHandler) AddUserToChannel(c *gin.Context) {
+	userID := c.MustGet("user_id").(uint)
+	channelID, _ := strconv.ParseUint(c.Param("id"), 10, 64)
 	var req struct {
-		UserID uint `json:"userId"`
+		TargetUserID uint `json:"userId"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	err := h.channelService.JoinChannel(uint(id), req.UserID)
+	err := h.channelService.AddUserToChannel(userID, uint(channelID), req.TargetUserID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to join channel"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Joined channel"})
+	c.JSON(http.StatusOK, gin.H{"message": "User added to channel"})
 }
 
 func (h *ChannelHandler) LeaveChannel(c *gin.Context) {
+	userID := c.MustGet("user_id").(uint)
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
-	var req struct {
-		UserID uint `json:"userId"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	err := h.channelService.LeaveChannel(uint(id), req.UserID)
+	err := h.channelService.LeaveChannel(uint(id), userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to leave channel"})
 		return
@@ -133,24 +130,19 @@ func (h *ChannelHandler) LeaveChannel(c *gin.Context) {
 }
 
 func (h *ChannelHandler) RemoveUserFromChannel(c *gin.Context) {
+	userID := c.MustGet("user_id").(uint)
 	channelID, _ := strconv.ParseUint(c.Param("id"), 10, 64)
-	userID, _ := strconv.ParseUint(c.Param("userId"), 10, 64)
-
-	err := h.channelService.RemoveUserFromChannel(uint(channelID), uint(userID))
+	var req struct {
+		UserID uint `json:"userId"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	err := h.channelService.RemoveUserFromChannel(userID, uint(channelID), req.UserID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove user"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "User removed from channel"})
-}
-
-func (h *ChannelHandler) GetMessagesByChannelID(c *gin.Context) {
-	channelID, _ := strconv.ParseUint(c.Param("id"), 10, 64)
-
-	messages, err := h.channelService.GetChatMessagesByChannel(uint(channelID))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load messages"})
-		return
-	}
-	c.JSON(http.StatusOK, messages)
 }

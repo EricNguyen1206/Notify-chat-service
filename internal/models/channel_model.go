@@ -12,7 +12,7 @@ type Channel struct {
 	Name    string `gorm:"not null" json:"name"`
 	OwnerID uint   `gorm:"not null;type:uint" json:"ownerId"` // userid
 
-	Members []*User `gorm:"many2many:channel_members"`
+	Members []*User `gorm:"many2many:channel_members" json:"members"`
 }
 
 type UpdateChannelRequest struct {
@@ -25,4 +25,12 @@ type ChannelResponse struct {
 	Name      string    `json:"name"`
 	Type      string    `json:"type"`
 	CreatedAt time.Time `json:"createdAt"`
+}
+
+type ChannelListResponse struct {
+	ID        uint      `json:"id"`
+	Name      string    `json:"name"`
+	OwnerID   uint      `json:"ownerId"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
