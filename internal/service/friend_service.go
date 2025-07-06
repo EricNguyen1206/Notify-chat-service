@@ -3,29 +3,28 @@ package service
 import (
 	"chat-service/internal/models"
 	"chat-service/internal/repository"
-	"context"
 	"errors"
 	"log"
 )
 
 type FriendService struct {
-	friendRepo repository.FriendRepository
+	friendRepo *repository.FriendRepository
 }
 
-func NewFriendService(friendRepo repository.FriendRepository) *FriendService {
-	return &FriendService{friendRepo: friendRepo}
+func NewFriendService(friendRepo *repository.FriendRepository) *FriendService {
+	return &FriendService{friendRepo}
 }
 
 func (s *FriendService) AddFriend(userID, friendID uint) error {
-	if ok, _ := s.friendRepo.IsFriend(context.Background(), userID, friendID); ok {
+	if ok, _ := s.friendRepo.IsFriend(userID, friendID); ok {
 		return errors.New("already friends")
 	}
-	return s.friendRepo.AddFriend(context.Background(), userID, friendID)
+	return s.friendRepo.AddFriend(userID, friendID)
 }
 
 func (s *FriendService) GetFriends(userID uint) ([]models.FriendResponse, error) {
-	friends, err := s.friendRepo.GetFriendsByUserID(context.Background(), userID)
-	friends2, err2 := s.friendRepo.GetFriendsByFriendID(context.Background(), userID)
+	friends, err := s.friendRepo.GetFriendsByUserID(userID)
+	friends2, err2 := s.friendRepo.GetFriendsByFriendID(userID)
 	if err != nil || err2 != nil {
 		return nil, err
 	}
@@ -54,5 +53,5 @@ func (s *FriendService) GetFriends(userID uint) ([]models.FriendResponse, error)
 }
 
 func (s *FriendService) RemoveFriend(userID, friendID uint) error {
-	return s.friendRepo.RemoveFriend(context.Background(), userID, friendID)
+	return s.friendRepo.RemoveFriend(userID, friendID)
 }

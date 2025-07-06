@@ -14,11 +14,9 @@ type User struct {
 	Email    string `gorm:"uniqueIndex;not null" json:"email"`
 	Password string `json:"-"`
 
-	Friends        []Friend   `gorm:"foreignKey:UserID;references:ID"`
-	FriendRequests []Friend   `gorm:"foreignKey:FriendID;references:ID"`
-	Channels       []*Channel `gorm:"many2many:channel_members"`
-	Servers        []*Server  `gorm:"many2many:server_members"`
-	// Chats          []Chat          `gorm:"foreignKey:UserID;references:ID"`
+	Friends        []FriendShip `gorm:"foreignKey:UserID;references:ID" json:"friends"`
+	FriendRequests []FriendShip `gorm:"foreignKey:FriendID;references:ID" json:"friendRequests"`
+	Channels       []*Channel   `gorm:"many2many:channel_members" json:"channels"`
 }
 
 func (u *User) BeforeCreate(tx *gorm.DB) error {

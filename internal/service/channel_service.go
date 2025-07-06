@@ -3,26 +3,59 @@ package service
 import (
 	"chat-service/internal/models"
 	"chat-service/internal/repository"
+	"errors"
 
 	"gorm.io/gorm"
 )
 
 type ChannelService struct {
-	repo *repository.ChannelRepository
+	repo     *repository.ChannelRepository
+	userRepo *repository.UserRepository
 }
 
-func NewChannelService(repo *repository.ChannelRepository) *ChannelService {
-	return &ChannelService{repo}
+func NewChannelService(repo *repository.ChannelRepository, userRepo *repository.UserRepository) *ChannelService {
+	return &ChannelService{repo, userRepo}
 }
 
-func (s *ChannelService) CreateChannel(name string, ownerID, serverID uint) (*models.Channel, error) {
-	channel := &models.Channel{
-		Name:     name,
-		OwnerID:  ownerID,
-		ServerID: serverID,
-		Members:  []*models.User{{Model: gorm.Model{ID: ownerID}}}, // Auto join
+func (s *ChannelService) GetAllChannel() ([]models.Channel, error) {
+	return s.repo.GetAllChannels()
+}
+
+func (s *ChannelService) GetUserChannels(userID uint) ([]models.ChannelListResponse, error) {
+	channels, err := s.repo.GetAllUserChannels(userID)
+	if err != nil {
+		return nil, err
 	}
-	err := s.repo.Create(channel)
+
+	// Convert to ChannelListResponse format
+	var response []models.ChannelListResponse
+	for _, channel := range channels {
+		response = append(response, models.ChannelListResponse{
+			ID:        channel.ID,
+			Name:      channel.Name,
+			OwnerID:   channel.OwnerID,
+			CreatedAt: channel.CreatedAt,
+			UpdatedAt: channel.UpdatedAt,
+		})
+	}
+
+	return response, nil
+}
+
+func (s *ChannelService) CreateChannel(name string, ownerID uint) (*models.Channel, error) {
+	owner, err := s.userRepo.FindByID(ownerID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("owner not found")
+		}
+		return nil, errors.New("failed to find owner: " + err.Error())
+	}
+	channel := &models.Channel{
+		Name:    name,
+		OwnerID: ownerID,
+		Members: []*models.User{owner},
+	}
+	err = s.repo.Create(channel)
 	return channel, err
 }
 
@@ -35,7 +68,22 @@ func (s *ChannelService) UpdateChannel(channelID uint, name string) error {
 	return s.repo.Update(channel)
 }
 
-func (s *ChannelService) DeleteChannel(channelID uint) error {
+func (s *ChannelService) DeleteChannel(ownerId, channelID uint) error {
+	// Check if channel exists and get channel details
+	channel, err := s.repo.GetByID(channelID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("channel not found")
+		}
+		return errors.New("failed to find channel: " + err.Error())
+	}
+
+	// Check if the user is the owner of the channel
+	if channel.OwnerID != ownerId {
+		return errors.New("only channel owner can delete channel")
+	}
+
+	// Delete channel (cascade deletion will be handled by GORM)
 	return s.repo.Delete(channelID)
 }
 
@@ -43,20 +91,111 @@ func (s *ChannelService) GetChannelByID(channelID uint) (*models.Channel, error)
 	return s.repo.GetByID(channelID)
 }
 
-func (s *ChannelService) GetChannelsByUserAndServer(userID, serverID uint) ([]models.Channel, error) {
-	return s.repo.GetListByUserAndServer(userID, serverID)
-}
-
 func (s *ChannelService) JoinChannel(channelID, userID uint) error {
+	// Check if channel exists
+	_, err := s.repo.GetByID(channelID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("channel not found")
+		}
+		return errors.New("failed to find channel: " + err.Error())
+	}
+
+	// Check if user exists
+	_, err = s.userRepo.FindByID(userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("user not found")
+		}
+		return errors.New("failed to find user: " + err.Error())
+	}
+
+	// Add user to channel
 	return s.repo.AddUser(channelID, userID)
 }
 
 func (s *ChannelService) LeaveChannel(channelID, userID uint) error {
+	// Check if channel exists
+	_, err := s.repo.GetByID(channelID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("channel not found")
+		}
+		return errors.New("failed to find channel: " + err.Error())
+	}
+
+	// Check if user exists
+	_, err = s.userRepo.FindByID(userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("user not found")
+		}
+		return errors.New("failed to find user: " + err.Error())
+	}
+
+	// Remove user from channel
 	return s.repo.RemoveUser(channelID, userID)
 }
 
-func (s *ChannelService) RemoveUserFromChannel(channelID, targetUserID uint) error {
+func (s *ChannelService) RemoveUserFromChannel(ownerId, channelID, targetUserID uint) error {
+	// Check if channel exists and get channel details
+	channel, err := s.repo.GetByID(channelID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("channel not found")
+		}
+		return errors.New("failed to find channel: " + err.Error())
+	}
+
+	// Check if the user is the owner of the channel
+	if channel.OwnerID != ownerId {
+		return errors.New("only channel owner can remove users")
+	}
+
+	// Check if target user exists
+	_, err = s.userRepo.FindByID(targetUserID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("target user not found")
+		}
+		return errors.New("failed to find target user: " + err.Error())
+	}
+
+	// Check if trying to remove the owner
+	if targetUserID == ownerId {
+		return errors.New("cannot remove channel owner")
+	}
+
+	// Remove user from channel
 	return s.repo.RemoveUser(channelID, targetUserID)
+}
+
+func (s *ChannelService) AddUserToChannel(ownerId, channelID, targetUserID uint) error {
+	// Check if channel exists and get channel details
+	channel, err := s.repo.GetByID(channelID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("channel not found")
+		}
+		return errors.New("failed to find channel: " + err.Error())
+	}
+
+	// Check if the user is the owner of the channel
+	if channel.OwnerID != ownerId {
+		return errors.New("only channel owner can add users")
+	}
+
+	// Check if target user exists
+	_, err = s.userRepo.FindByID(targetUserID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("target user not found")
+		}
+		return errors.New("failed to find target user: " + err.Error())
+	}
+
+	// Add user to channel
+	return s.repo.AddUser(channelID, targetUserID)
 }
 
 func (s *ChannelService) GetChatMessagesByChannel(channelID uint) ([]models.Chat, error) {

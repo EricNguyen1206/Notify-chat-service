@@ -1,47 +1,54 @@
 package configs
 
 import (
-	"fmt"
+	"chat-service/configs/database"
+	"chat-service/configs/utils/ws"
 	"log"
+	"net/http"
 	"os"
-	"strconv"
+	"sync"
 	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/redis/go-redis/v9"
+	"gorm.io/gorm"
 )
 
 // Config holds all configuration values
 type Config struct {
-	App struct {
-		Port      string
-		JWTSecret string
-		JWTExpire time.Duration
-	}
+	Port       string
+	JWTSecret  string
+	JWTExpire  time.Duration
+	DB         *gorm.DB
+	Redis      *redis.Client
+	WSUpgrader websocket.Upgrader
+	WSHub      *ws.Hub
 
-	// Database
-	MySQL struct {
-		DBHost     string
-		DBPort     string
-		DBUser     string
-		DBPassword string
-		DBName     string
-		DSN        string
-	}
+	// // Redis
+	// Redis struct {
+	// 	Host     string
+	// 	Port     string
+	// 	Password string
+	// 	Addr     string
+	// }
 
-	// Redis
-	Redis struct {
-		Host     string
-		Port     string
-		Password string
-		Addr     string
-	}
+	// // Postgrest
+	// Postgres struct {
+	// 	User     string
+	// 	Password string
+	// 	Host     string
+	// 	Port     string
+	// 	DbName   string
+	// }
 
 	// MinIO
-	MinIO struct {
-		Endpoint string
-		User     string
-		Password string
-		UseSSL   bool
-		Bucket   string
-	}
+	// MinIO struct {
+	// 	Endpoint string
+	// 	User     string
+	// 	Password string
+	// 	UseSSL   bool
+	// 	Bucket   string
+	// }
 
 	// Kafka
 	// Kafka struct {
@@ -50,49 +57,51 @@ type Config struct {
 	// }
 }
 
+var (
+	ConfigInstance *Config
+	once           sync.Once
+)
+
 // Load loads configuration from .env file
 func Load() *Config {
-	var cfg Config
+	once.Do(func() {
 
-	var expire = getEnv("NOTIFY_JWT_EXPIRE", "24h")
+		var expire = getEnv("NOTIFY_JWT_EXPIRE", "24h")
 
-	jwtExpire, err := time.ParseDuration(expire)
-	if err != nil {
-		log.Fatal("Invalid JWT_EXPIRE format")
-	}
-	// App
-	cfg.App.Port = getEnv("NOTIFY_PORT", "8080")
-	cfg.App.JWTSecret = getEnv("NOTIFY_JWT_SECRET", "secret")
-	cfg.App.JWTExpire = jwtExpire
+		// App
+		appPort := getEnv("NOTIFY_PORT", "8080")
+		appJWTSecret := getEnv("NOTIFY_JWT_SECRET", "secret")
+		appJWTExpire, err := time.ParseDuration(expire)
+		if err != nil {
+			log.Fatal("Invalid JWT_EXPIRE format")
+		}
 
-	// Redis
-	cfg.Redis.Host = getEnv("NOTIFY_REDIS_HOST", "localhost:6379")
-	cfg.Redis.Port = getEnv("NOTIFY_REDIS_PORT", "6379")
-	cfg.Redis.Password = getEnv("NOTIFY_REDIS_PASSWORD", "")
-	cfg.Redis.Addr = fmt.Sprintf("%s:%s", cfg.Redis.Host, cfg.Redis.Port)
+		// Redis
+		redisClient, _ := database.InitRedis()
 
-	// MySQL
-	cfg.MySQL.DBHost = getEnv("NOTIFY_MYSQL_HOST", "localhost")
-	cfg.MySQL.DBPort = getEnv("NOTIFY_MYSQL_PORT", "3306")
-	cfg.MySQL.DBUser = getEnv("NOTIFY_MYSQL_USER", "admin")
-	cfg.MySQL.DBPassword = getEnv("NOTIFY_MYSQL_PASSWORD", "password")
-	cfg.MySQL.DBName = getEnv("NOTIFY_MYSQL_DATABASE", "voting_db")
-	cfg.MySQL.DSN = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-		cfg.MySQL.DBUser, cfg.MySQL.DBPassword, cfg.MySQL.DBHost, cfg.MySQL.DBPort, cfg.MySQL.DBName)
+		// Postgres
+		postgresDB, _ := database.NewPostgresConnection()
 
-	// MinIO
-	cfg.MinIO.Endpoint = getEnv("NOTIFY_MINIO_ENDPOINT", "localhost:9000")
-	cfg.MinIO.User = getEnv("NOTIFY_MINIO_ROOT_USER", "admin")
-	cfg.MinIO.Password = getEnv("NOTIFY_MINIO_ROOT_PASSWORD", "password")
-	cfg.MinIO.UseSSL, _ = strconv.ParseBool(getEnv("NOTIFY_MINIO_USE_SSL", "true"))
-	cfg.MinIO.Bucket = getEnv("NOTIFY_MINIO_BUCKET", "voting-images")
+		upgrader := websocket.Upgrader{
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+			// Allow all origin connect to websocket
+			// TODO: fix in production
+			CheckOrigin: func(r *http.Request) bool { return true },
+		}
+		wsHub := ws.WsNewHub(redisClient)
 
-	// Kafka
-	// cfg.Kafka.Brokers = []string{"localhost:9092"}
-	// cfg.Kafka.Topic = getEnv("NOTIFY_KAFKA_TOPIC", "voting-events")
-
-	// Load environment variables from .env file
-	return &cfg
+		ConfigInstance = &Config{
+			Port:       appPort,
+			JWTSecret:  appJWTSecret,
+			JWTExpire:  appJWTExpire,
+			DB:         postgresDB,
+			Redis:      redisClient,
+			WSUpgrader: upgrader,
+			WSHub:      wsHub,
+		}
+	})
+	return ConfigInstance
 }
 
 // Helper function to get environment variable with default value

@@ -2,15 +2,14 @@ package router
 
 import (
 	"chat-service/configs"
-	"chat-service/configs/database"
 	"chat-service/configs/middleware"
 	"chat-service/internal/handler"
 	"chat-service/internal/repository"
 	"chat-service/internal/service"
-	"fmt"
 	"log"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 	"gorm.io/gorm"
 )
 
@@ -18,67 +17,35 @@ type App struct {
 	router     *gin.Engine
 	postgresDB *gorm.DB
 	// mongoDB      *database.MongoDB
-	// websocketHub *ws.Hub
+	WSUpgrader websocket.Upgrader
 }
 
 func NewApp() (*App, error) {
 	config := configs.Load()
-	// Initialize databases
-	postgresDB, err := database.NewPostgresConnection()
-	if err != nil {
-		return nil, err
-	}
-	redisClient, _ := database.InitRedis()
-
-	// mongoDB, err := database.NewMongoConnection()
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// Initialize WebSocket hub
-	// hub := ws.NewHub()
 
 	// Repository
-	userRepo := repository.NewUserRepository(postgresDB)
-	friendRepo := repository.NewFriendRepository(postgresDB, redisClient)
-	channelRepo := repository.NewChannelRepository(postgresDB)
-	serverRepo := repository.NewServerRepository(postgresDB)
+	userRepo := repository.NewUserRepository(config.DB)
+	friendRepo := repository.NewFriendRepository(config.DB, config.Redis)
+	channelRepo := repository.NewChannelRepository(config.DB)
 
 	// Service
-	userService := service.NewUserService(userRepo, config.App.JWTSecret, redisClient)
+	userService := service.NewUserService(userRepo, config.JWTSecret, config.Redis)
 	friendService := service.NewFriendService(friendRepo)
-	channelService := service.NewChannelService(channelRepo, userRepo, redisClient)
-	serverService := service.NewServerService(serverRepo)
+	channelService := service.NewChannelService(channelRepo, userRepo)
 
 	// Handler
-	userHandler := handler.NewUserHandler(userService, redisClient)
+	userHandler := handler.NewUserHandler(userService, config.Redis)
 	friendHandler := handler.NewFriendHandler(friendService)
 	channelHandler := handler.NewChannelHandler(channelService)
-	serverHandler := handler.NewServerHandler(serverService)
+
+	wsHandler := handler.NewWSHandler(config.WSHub)
 
 	// Setup router
 	router := gin.Default()
 
-	// Add CORS middleware
+	// Add middlewares
 	router.Use(middleware.CORS())
-
-	// Add logging middleware
-	router.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
-		return fmt.Sprintf("[%s] | %s | %d | %s | %s | %s | %s | %s | %s\n",
-			param.TimeStamp.Format("2006-01-02 15:04:05"),
-			param.ClientIP,
-			param.StatusCode,
-			param.Method,
-			param.Path,
-			param.Request.UserAgent(),
-			param.ErrorMessage,
-			param.Latency,
-			param.Request.Proto,
-		)
-	}))
-
-	// WebSocket routes
-	// router.GET("/ws", handler.HandleWebSocket)
+	router.Use(middleware.LogApi())
 
 	// Register API routes
 	api := router.Group("/api")
@@ -89,17 +56,18 @@ func NewApp() (*App, error) {
 			})
 		})
 
+		// WebSocket routes
+		wsHandler.RegisterRoutes(api)
 		userHandler.RegisterRoutes(api)
 		friendHandler.RegisterRoutes(api)
 		channelHandler.RegisterRoutes(api)
-		serverHandler.RegisterRoutes(api)
 	}
 
 	return &App{
 		router:     router,
-		postgresDB: postgresDB,
+		postgresDB: config.DB,
 		// mongoDB:      mongoDB,
-		// websocketHub: hub,
+		WSUpgrader: config.WSUpgrader,
 	}, nil
 }
 

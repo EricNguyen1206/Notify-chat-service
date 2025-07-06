@@ -56,8 +56,5 @@ func (h *FriendHandler) RegisterRoutes(r *gin.RouterGroup) {
 		friends.Use(middleware.Auth())
 		friends.POST("/", h.AddFriend)
 		friends.GET("/", h.GetFriends)
-		// friends.GET("/friends/pending", h.GetPendingFriends)
-		// friends.POST("/friends/accept/:id", h.AcceptFriendRequest)
-		// friends.POST("/friends/reject/:id", h.RejectFriendRequest)
 	}
 }

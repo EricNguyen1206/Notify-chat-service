@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"chat-service/configs"
 	"log"
 	"net/http"
 	"strings"
@@ -11,7 +10,7 @@ import (
 )
 
 func Auth() gin.HandlerFunc {
-	jwtSecret := configs.Load().App.JWTSecret
+	jwtSecret := "secret"
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {

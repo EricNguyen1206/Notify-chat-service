@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"chat-service/configs"
 	"net/http"
 	"strings"
 
@@ -11,7 +10,7 @@ import (
 
 // WSAuth handles WebSocket authentication via query parameter
 func WSAuth() gin.HandlerFunc {
-	jwtSecret := configs.Load().App.JWTSecret
+	jwtSecret := "secret"
 	return func(c *gin.Context) {
 		// Get token from query parameter
 		tokenString := c.Query("token")

@@ -1,5 +1,11 @@
 package utils
 
+import (
+	"errors"
+
+	"github.com/gin-gonic/gin"
+)
+
 func GetUserID(c *gin.Context) (uint, error) {
 	userIDToken, exists := c.Get("user_id")
 	if !exists {

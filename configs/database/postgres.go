@@ -73,12 +73,9 @@ func NewPostgresConnection() (*gorm.DB, error) {
 	// Auto migrate the schema with proper error handling
 	err = db.AutoMigrate(
 		&models.User{},
-		&models.Server{},
-		&models.ServerMembers{},
 		&models.Channel{},
 		&models.Chat{},
-		&models.Friend{},
-		// &models.JoinServer{},
+		&models.FriendShip{},
 	)
 	if err != nil {
 		// Check if the error is about existing tables
@@ -120,14 +117,11 @@ func addIndexes(db *gorm.DB) error {
 	}{
 		{"users", []string{"email"}},
 		// {"servers", []string{"owner"}},
-		// {"categories", []string{"server_id"}},
 		// {"channels", []string{"category_id"}},
 		// {"friend_pending", []string{"sender_email", "receiver_email"}},
 		// {"friends", []string{"sender_email", "receiver_email"}},
 		// {"direct_messages", []string{"owner_email", "friend_email"}},
-		// {"join_server", []string{"server_id", "user_id"}},
 		// {"chats", []string{"user_id"}},
-		// {"chats", []string{"server_id", "channel_id"}},
 	}
 
 	for _, idx := range indexes {

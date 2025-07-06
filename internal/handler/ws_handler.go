@@ -1,88 +1,67 @@
 package handler
 
-// import (
-// 	"encoding/json"
-// 	"fmt"
-// 	"net/http"
-// 	"strconv"
-// 	"time"
+import (
+	"chat-service/configs"
+	"chat-service/configs/utils"
+	"chat-service/configs/utils/ws"
+	"log"
 
-// 	"chat-service/configs/utils/ws"
+	"github.com/gin-gonic/gin"
+)
 
-// 	"github.com/gin-gonic/gin"
-// 	"github.com/gorilla/websocket"
-// )
+type WSHandler struct {
+	hub *ws.Hub
+}
 
-// var upgrader = websocket.Upgrader{
-// 	CheckOrigin: func(r *http.Request) bool { return true },
-// }
+func NewWSHandler(hub *ws.Hub) *WSHandler {
+	return &WSHandler{hub: hub}
+}
 
-// func HandleWebSocket(c *gin.Context) {
-// 	// Get user ID from query parameter
-// 	userIDStr := c.Query("userId")
-// 	userID, err := strconv.ParseUint(userIDStr, 10, 32)
-// 	if err != nil {
-// 		c.JSON(400, gin.H{"error": fmt.Sprintf("Invalid user ID: %v", err)})
-// 		return
-// 	}
-// 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
-// 	if err != nil {
-// 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Failed to upgrade to WebSocket"})
-// 		return
-// 	}
+// RegisterRoutes maps HTTP methods to handler functions
+func (h *WSHandler) RegisterRoutes(r *gin.RouterGroup) {
+	wsRoutes := r.Group("/ws")
+	{
+		wsRoutes.GET("", h.HandleWebSocket)
+	}
+}
 
-// 	client := &ws.Client{
-// 		UserID: uint(userID),
-// 		Conn:   conn,
-// 		Send:   make(chan []byte, 256),
-// 	}
+func (h *WSHandler) HandleWebSocket(c *gin.Context) {
+	// Get userId from query parameters: /api/ws?userId=1
+	userIDStr := c.Query("userId")
+	if userIDStr == "" {
+		log.Printf("🔴 WebSocket connection failed: missing userId parameter")
+		c.JSON(400, gin.H{"error": "userId parameter is required"})
+		return
+	}
 
-// 	ws.ChatHub.RegisterClient(client)
+	userID, err := utils.StringToUint(userIDStr)
+	if err != nil {
+		log.Printf("🔴 WebSocket connection failed: invalid userId '%s': %v", userIDStr, err)
+		c.JSON(400, gin.H{"error": "invalid userId parameter"})
+		return
+	}
 
-// 	go writePump(client)
-// 	readPump(client)
-// }
+	log.Printf("🟢 New WebSocket connection request from User ID: %d", userID)
 
-// func readPump(client *ws.Client) {
-// 	defer func() {
-// 		ws.ChatHub.UnregisterClient(client)
-// 		client.Conn.Close()
-// 	}()
+	// Upgrade the connection to websocket protocol
+	conn, err := configs.ConfigInstance.WSUpgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		log.Printf("🔴 WebSocket upgrade failed for User %d: %v", userID, err)
+		return
+	}
+	log.Printf("✅ WebSocket upgrade success for User %d", userID)
 
-// 	for {
-// 		_, msg, err := client.Conn.ReadMessage()
-// 		if err != nil {
-// 			break
-// 		}
+	// Create new Client
+	client := &ws.Client{
+		ID:   userID,
+		Conn: conn,
+	}
 
-// 		var parsed struct {
-// 			To      uint   `json:"to"`
-// 			Content string `json:"content"`
-// 		}
-// 		if err := json.Unmarshal(msg, &parsed); err != nil {
-// 			continue
-// 		}
+	log.Printf("📝 Registering client %d to hub", userID)
+	// Regist client to hub
+	h.hub.Register <- client
 
-// 		ws.ChatHub.SendDirectMessage(ws.DirectMessage{
-// 			FromUserID: client.UserID,
-// 			ToUserID:   parsed.To,
-// 			Content:    parsed.Content,
-// 			Timestamp:  time.Now().UTC(),
-// 		})
-// 	}
-// }
-
-// func writePump(client *ws.Client) {
-// 	defer client.Conn.Close()
-
-// 	for {
-// 		select {
-// 		case msg, ok := <-client.Send:
-// 			if !ok {
-// 				client.Conn.WriteMessage(websocket.CloseMessage, []byte{})
-// 				return
-// 			}
-// 			client.Conn.WriteMessage(websocket.TextMessage, msg)
-// 		}
-// 	}
-// }
+	log.Printf("🚀 Starting message handler for client %d", userID)
+	// Start handle message
+	go client.WsHandleIncomingMessages(h.hub)
+}
