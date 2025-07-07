@@ -201,3 +201,7 @@ func (s *ChannelService) AddUserToChannel(ownerId, channelID, targetUserID uint)
 func (s *ChannelService) GetChatMessagesByChannel(channelID uint) ([]models.Chat, error) {
 	return s.repo.GetChatMessages(channelID)
 }
+
+func (s *ChannelService) GetChatMessagesByChannelWithPagination(channelID uint, limit int, before *int64) ([]models.Chat, error) {
+	return s.repo.GetChatMessagesWithPagination(channelID, limit, before)
+}

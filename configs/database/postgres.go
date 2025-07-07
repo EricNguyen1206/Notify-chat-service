@@ -14,13 +14,7 @@ import (
 	// "gorm.io/gorm/logger"
 )
 
-func NewPostgresConnection() (*gorm.DB, error) {
-	user := "postgres"
-	password := "password"
-	host := "localhost"
-	port := "5432"
-	dbname := "postgres"
-
+func NewPostgresConnection(user, password, host, port, dbname string) (*gorm.DB, error) {
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
 		host, user, password, dbname, port)
 
@@ -67,7 +61,6 @@ func NewPostgresConnection() (*gorm.DB, error) {
 		&models.User{},
 		&models.Channel{},
 		&models.Chat{},
-		&models.FriendShip{},
 	)
 	if err != nil {
 		// Check if the error is about existing tables

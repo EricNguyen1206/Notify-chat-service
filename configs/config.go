@@ -5,24 +5,30 @@ import (
 	"chat-service/configs/utils/ws"
 	"log"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
+	"github.com/spf13/viper"
 	"gorm.io/gorm"
 )
 
 // Config holds all configuration values
 type Config struct {
-	Port       string
-	JWTSecret  string
-	JWTExpire  time.Duration
-	DB         *gorm.DB
-	Redis      *redis.Client
-	WSUpgrader websocket.Upgrader
-	WSHub      *ws.Hub
+	Port             string
+	JWTSecret        string
+	JWTExpire        time.Duration
+	DB               *gorm.DB
+	Redis            *redis.Client
+	RedisURL         string
+	PostgresUser     string
+	PostgresPassword string
+	PostgresHost     string
+	PostgresPort     string
+	PostgresDB       string
+	WSUpgrader       websocket.Upgrader
+	WSHub            *ws.Hub
 }
 
 var (
@@ -33,22 +39,38 @@ var (
 // Load loads configuration from .env file
 func Load() *Config {
 	once.Do(func() {
-
-		var expire = getEnv("NOTIFY_JWT_EXPIRE", "24h")
+		// Viper setup
+		viper.SetDefault("NOTIFY_PORT", "8080")
+		viper.SetDefault("NOTIFY_JWT_SECRET", "secret")
+		viper.SetDefault("NOTIFY_JWT_EXPIRE", "24h")
+		viper.SetDefault("REDIS_URL", "redis://:mypassword@127.0.0.1:6379/0")
+		viper.SetDefault("POSTGRES_USER", "postgres")
+		viper.SetDefault("POSTGRES_PASSWORD", "password")
+		viper.SetDefault("POSTGRES_HOST", "localhost")
+		viper.SetDefault("POSTGRES_PORT", "5432")
+		viper.SetDefault("POSTGRES_DB", "postgres")
+		viper.AutomaticEnv()
 
 		// App
-		appPort := getEnv("NOTIFY_PORT", "8080")
-		appJWTSecret := getEnv("NOTIFY_JWT_SECRET", "secret")
+		appPort := viper.GetString("NOTIFY_PORT")
+		appJWTSecret := viper.GetString("NOTIFY_JWT_SECRET")
+		expire := viper.GetString("NOTIFY_JWT_EXPIRE")
 		appJWTExpire, err := time.ParseDuration(expire)
 		if err != nil {
 			log.Fatal("Invalid JWT_EXPIRE format")
 		}
 
 		// Redis
-		redisClient, _ := database.InitRedis()
+		redisURL := viper.GetString("REDIS_URL")
+		redisClient, _ := database.InitRedis(redisURL)
 
 		// Postgres
-		postgresDB, _ := database.NewPostgresConnection()
+		pgUser := viper.GetString("POSTGRES_USER")
+		pgPassword := viper.GetString("POSTGRES_PASSWORD")
+		pgHost := viper.GetString("POSTGRES_HOST")
+		pgPort := viper.GetString("POSTGRES_PORT")
+		pgDB := viper.GetString("POSTGRES_DB")
+		postgresDB, _ := database.NewPostgresConnection(pgUser, pgPassword, pgHost, pgPort, pgDB)
 
 		upgrader := websocket.Upgrader{
 			ReadBufferSize:  1024,
@@ -60,22 +82,20 @@ func Load() *Config {
 		wsHub := ws.WsNewHub(redisClient)
 
 		ConfigInstance = &Config{
-			Port:       appPort,
-			JWTSecret:  appJWTSecret,
-			JWTExpire:  appJWTExpire,
-			DB:         postgresDB,
-			Redis:      redisClient,
-			WSUpgrader: upgrader,
-			WSHub:      wsHub,
+			Port:             appPort,
+			JWTSecret:        appJWTSecret,
+			JWTExpire:        appJWTExpire,
+			DB:               postgresDB,
+			Redis:            redisClient,
+			RedisURL:         redisURL,
+			PostgresUser:     pgUser,
+			PostgresPassword: pgPassword,
+			PostgresHost:     pgHost,
+			PostgresPort:     pgPort,
+			PostgresDB:       pgDB,
+			WSUpgrader:       upgrader,
+			WSHub:            wsHub,
 		}
 	})
 	return ConfigInstance
-}
-
-// Helper function to get environment variable with default value
-func getEnv(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	return fallback
 }

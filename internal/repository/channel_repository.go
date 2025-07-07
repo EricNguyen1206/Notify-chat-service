@@ -77,3 +77,18 @@ func (r *ChannelRepository) GetChatMessages(channelID uint) ([]models.Chat, erro
 		Find(&messages).Error
 	return messages, err
 }
+
+// GetChatMessagesWithPagination returns chat messages for a channel with pagination and time-based infinite scroll
+func (r *ChannelRepository) GetChatMessagesWithPagination(channelID uint, limit int, before *int64) ([]models.Chat, error) {
+	var messages []models.Chat
+	db := r.db.Where("channel_id = ?", channelID)
+	if before != nil {
+		db = db.Where("created_at < to_timestamp(?)", *before)
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 20 // default limit
+	}
+	db = db.Order("created_at DESC").Limit(limit)
+	err := db.Find(&messages).Error
+	return messages, err
+}

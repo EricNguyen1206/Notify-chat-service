@@ -1,4 +1,3 @@
-basePath: /api
 definitions:
   models.ChannelListResponse:
     properties:
@@ -24,15 +23,52 @@ definitions:
       type:
         type: string
     type: object
-  models.FriendResponse:
+  models.ChatRequest:
     properties:
-      email:
+      channelId:
+        description: for channel
+        type: integer
+      fileName:
+        type: string
+      receiverId:
+        description: for direct
+        type: integer
+      text:
+        type: string
+      type:
+        enum:
+        - direct
+        - channel
+        type: string
+      url:
+        type: string
+    required:
+    - type
+    type: object
+  models.ChatResponse:
+    properties:
+      channelId:
+        description: channel
+        type: integer
+      createdAt:
+        type: string
+      fileName:
         type: string
       id:
         type: integer
-      status:
+      receiverId:
+        description: Relate to type message
+        type: integer
+      senderId:
+        type: integer
+      senderName:
         type: string
-      username:
+      text:
+        type: string
+      type:
+        description: '"direct" | "channel"'
+        type: string
+      url:
         type: string
     type: object
   models.LoginRequest:
@@ -65,20 +101,8 @@ definitions:
       username:
         type: string
     type: object
-host: localhost:8080
 info:
-  contact:
-    email: support@swagger.io
-    name: API Support
-    url: http://www.swagger.io/support
-  description: A real-time chat service API with WebSocket support for instant messaging,
-    user management, friend system, and channel management.
-  license:
-    name: Apache 2.0
-    url: http://www.apache.org/licenses/LICENSE-2.0.html
-  termsOfService: http://swagger.io/terms/
-  title: Chat Service API
-  version: "1.0"
+  contact: {}
 paths:
   /auth/login:
     post:
@@ -463,59 +487,25 @@ paths:
       summary: Leave channel
       tags:
       - channels
-  /friends/:
-    get:
-      consumes:
-      - application/json
-      description: Get the list of friends for the current user
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: List of friends retrieved successfully
-          schema:
-            additionalProperties:
-              items:
-                $ref: '#/definitions/models.FriendResponse'
-              type: array
-            type: object
-        "401":
-          description: Unauthorized - invalid or missing token
-          schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Internal server error
-          schema:
-            additionalProperties: true
-            type: object
-      security:
-      - BearerAuth: []
-      summary: Get user's friends
-      tags:
-      - friends
+  /chats/:
     post:
       consumes:
       - application/json
-      description: Send a friend request to another user
+      description: Create a new chat message (channel or direct)
       parameters:
-      - description: Friend request data
+      - description: Chat message data
         in: body
         name: request
         required: true
         schema:
-          additionalProperties:
-            type: integer
-          type: object
+          $ref: '#/definitions/models.ChatRequest'
       produces:
       - application/json
       responses:
-        "200":
-          description: Friend request sent successfully
+        "201":
+          description: Chat message created
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/models.ChatResponse'
         "400":
           description: Bad request - invalid input data
           schema:
@@ -533,9 +523,49 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: Add a friend
+      summary: Create a new chat message
       tags:
-      - friends
+      - chats
+  /chats/channel/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get all chat messages for a specific channel
+      parameters:
+      - description: Channel ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of chat messages
+          schema:
+            items:
+              $ref: '#/definitions/models.ChatResponse'
+            type: array
+        "401":
+          description: Unauthorized - invalid or missing token
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Channel not found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get chat messages in a channel
+      tags:
+      - chats
   /health:
     get:
       consumes:
@@ -604,10 +634,4 @@ paths:
       summary: WebSocket connection
       tags:
       - websocket
-securityDefinitions:
-  BearerAuth:
-    description: Type "Bearer" followed by a space and JWT token.
-    in: header
-    name: Authorization
-    type: apiKey
 swagger: "2.0"
