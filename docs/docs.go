@@ -9,16 +9,7 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "termsOfService": "http://swagger.io/terms/",
-        "contact": {
-            "name": "API Support",
-            "url": "http://www.swagger.io/support",
-            "email": "support@swagger.io"
-        },
-        "license": {
-            "name": "Apache 2.0",
-            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
-        },
+        "contact": {},
         "version": "{{.Version}}"
     },
     "host": "{{.Host}}",
@@ -606,14 +597,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/friends/": {
-            "get": {
+        "/chats/": {
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get the list of friends for the current user",
+                "description": "Create a new chat message (channel or direct)",
                 "consumes": [
                     "application/json"
                 ],
@@ -621,20 +612,32 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "friends"
+                    "chats"
                 ],
-                "summary": "Get user's friends",
+                "summary": "Create a new chat message",
+                "parameters": [
+                    {
+                        "description": "Chat message data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.ChatRequest"
+                        }
+                    }
+                ],
                 "responses": {
-                    "200": {
-                        "description": "List of friends retrieved successfully",
+                    "201": {
+                        "description": "Chat message created",
+                        "schema": {
+                            "$ref": "#/definitions/models.ChatResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - invalid input data",
                         "schema": {
                             "type": "object",
-                            "additionalProperties": {
-                                "type": "array",
-                                "items": {
-                                    "$ref": "#/definitions/models.FriendResponse"
-                                }
-                            }
+                            "additionalProperties": true
                         }
                     },
                     "401": {
@@ -652,14 +655,16 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "post": {
+            }
+        },
+        "/chats/channel/{id}": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Send a friend request to another user",
+                "description": "Get all chat messages for a specific channel",
                 "consumes": [
                     "application/json"
                 ],
@@ -667,42 +672,37 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "friends"
+                    "chats"
                 ],
-                "summary": "Add a friend",
+                "summary": "Get chat messages in a channel",
                 "parameters": [
                     {
-                        "description": "Friend request data",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "integer"
-                            }
-                        }
+                        "type": "integer",
+                        "description": "Channel ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Friend request sent successfully",
+                        "description": "List of chat messages",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.ChatResponse"
                             }
                         }
                     },
-                    "400": {
-                        "description": "Bad request - invalid input data",
+                    "401": {
+                        "description": "Unauthorized - invalid or missing token",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
                         }
                     },
-                    "401": {
-                        "description": "Unauthorized - invalid or missing token",
+                    "404": {
+                        "description": "Channel not found",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -861,19 +861,72 @@ const docTemplate = `{
                 }
             }
         },
-        "models.FriendResponse": {
+        "models.ChatRequest": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "channelId": {
+                    "description": "for channel",
+                    "type": "integer"
+                },
+                "fileName": {
+                    "type": "string"
+                },
+                "receiverId": {
+                    "description": "for direct",
+                    "type": "integer"
+                },
+                "text": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "direct",
+                        "channel"
+                    ]
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.ChatResponse": {
             "type": "object",
             "properties": {
-                "email": {
+                "channelId": {
+                    "description": "channel",
+                    "type": "integer"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "fileName": {
                     "type": "string"
                 },
                 "id": {
                     "type": "integer"
                 },
-                "status": {
+                "receiverId": {
+                    "description": "Relate to type message",
+                    "type": "integer"
+                },
+                "senderId": {
+                    "type": "integer"
+                },
+                "senderName": {
                     "type": "string"
                 },
-                "username": {
+                "text": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "\"direct\" | \"channel\"",
+                    "type": "string"
+                },
+                "url": {
                     "type": "string"
                 }
             }
@@ -924,25 +977,17 @@ const docTemplate = `{
                 }
             }
         }
-    },
-    "securityDefinitions": {
-        "BearerAuth": {
-            "description": "Type \"Bearer\" followed by a space and JWT token.",
-            "type": "apiKey",
-            "name": "Authorization",
-            "in": "header"
-        }
     }
 }`
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "1.0",
-	Host:             "localhost:8080",
-	BasePath:         "/api",
+	Version:          "",
+	Host:             "",
+	BasePath:         "",
 	Schemes:          []string{},
-	Title:            "Chat Service API",
-	Description:      "A real-time chat service API with WebSocket support for instant messaging, user management, friend system, and channel management.",
+	Title:            "",
+	Description:      "",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

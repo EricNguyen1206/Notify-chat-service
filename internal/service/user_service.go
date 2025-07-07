@@ -16,13 +16,10 @@ import (
 
 // Custom errors
 var (
-	ErrUserNotFound          = errors.New("user not found")
-	ErrUserAlreadyExists     = errors.New("user already exists")
-	ErrInvalidCredentials    = errors.New("invalid credentials")
-	ErrFriendRequestExists   = errors.New("friend request already exists")
-	ErrFriendRequestNotFound = errors.New("friend request not found")
-	ErrFriendExists          = errors.New("friend relationship already exists")
-	ErrInvalidRequest        = errors.New("invalid request")
+	ErrUserNotFound       = errors.New("user not found")
+	ErrUserAlreadyExists  = errors.New("user already exists")
+	ErrInvalidCredentials = errors.New("invalid credentials")
+	ErrInvalidRequest     = errors.New("invalid request")
 )
 
 type UserService interface {

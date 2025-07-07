@@ -45,7 +45,6 @@ func Auth() gin.HandlerFunc {
 
 		userID, ok := claims["user_id"].(float64)
 		if !ok {
-			log.Printf("TEST Invalid user ID in token, claims: %v", claims)
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error":   "invalid user ID in token",
 				"details": "user_id claim must be a number",
@@ -55,7 +54,6 @@ func Auth() gin.HandlerFunc {
 		}
 
 		// Set user_id vào context
-		log.Printf("TEST Successfully authenticated user ID: %d", uint(userID))
 		c.Set("user_id", uint(userID))
 		c.Set("email", claims["email"])
 		c.Next()

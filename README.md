@@ -25,7 +25,6 @@ A high-performance real-time chat service built with Go, featuring WebSocket sup
   - [📖 Usage](#-usage)
     - [API Endpoints](#api-endpoints)
       - [Authentication](#authentication)
-      - [Friends](#friends)
       - [Channels](#channels)
       - [WebSocket](#websocket)
     - [WebSocket Events](#websocket-events)
@@ -58,7 +57,6 @@ Notify Chat Service is a robust, scalable real-time messaging platform designed 
 - **Real-time messaging** with WebSocket support
 - **Horizontal scaling** through Redis pub/sub
 - **Secure authentication** with JWT tokens
-- **Friend system** with request/accept functionality
 - **Channel-based messaging** for group chats
 - **RESTful API** for client integration
 - **Docker-ready** for easy deployment
@@ -89,7 +87,6 @@ This project is built with modern technologies and best practices:
 
 - ✅ **Real-time Messaging** - Instant message delivery via WebSocket
 - ✅ **User Authentication** - Secure JWT-based authentication
-- ✅ **Friend System** - Send/accept friend requests
 - ✅ **Channel Messaging** - Group chat functionality
 - ✅ **Direct Messaging** - Private conversations
 - ✅ **Horizontal Scaling** - Redis pub/sub for multi-instance support
@@ -168,15 +165,6 @@ REDIS_URL=redis://localhost:6379
 POST /api/auth/register
 POST /api/auth/login
 GET  /api/users/profile
-```
-
-#### Friends
-```http
-POST   /api/friends/request
-POST   /api/friends/accept
-POST   /api/friends/reject
-GET    /api/friends/list
-DELETE /api/friends/remove
 ```
 
 #### Channels

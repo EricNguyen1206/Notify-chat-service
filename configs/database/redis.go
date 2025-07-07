@@ -9,8 +9,11 @@ import (
 
 var RedisClient *redis.Client
 
-func InitRedis() (*redis.Client, error) {
-	opt, _ := redis.ParseURL("rediss://default:AVGBAAIjcDE5MzM5ZmQ4NTMwYWQ0OGM5OTRiZDk0NDk0MjFiZTA4OXAxMA@generous-pipefish-20865.upstash.io:6379")
+func InitRedis(redisURL string) (*redis.Client, error) {
+	if redisURL == "" {
+		redisURL = "redis://:mypassword@127.0.0.1:6379/0"
+	}
+	opt, _ := redis.ParseURL(redisURL)
 	RedisClient := redis.NewClient(opt)
 
 	// Health check
@@ -18,5 +21,4 @@ func InitRedis() (*redis.Client, error) {
 	defer cancel()
 	_, err := RedisClient.Ping(ctx).Result()
 	return RedisClient, err
-
 }

@@ -48,17 +48,14 @@ func NewApp() (*App, error) {
 
 	// Repository
 	userRepo := repository.NewUserRepository(config.DB)
-	friendRepo := repository.NewFriendRepository(config.DB, config.Redis)
 	channelRepo := repository.NewChannelRepository(config.DB)
 
 	// Service
 	userService := service.NewUserService(userRepo, config.JWTSecret, config.Redis)
-	friendService := service.NewFriendService(friendRepo)
 	channelService := service.NewChannelService(channelRepo, userRepo)
 
 	// Handler
 	userHandler := handler.NewUserHandler(userService, config.Redis)
-	friendHandler := handler.NewFriendHandler(friendService)
 	channelHandler := handler.NewChannelHandler(channelService)
 
 	wsHandler := handler.NewWSHandler(config.WSHub)
@@ -78,7 +75,6 @@ func NewApp() (*App, error) {
 		// WebSocket routes
 		wsHandler.RegisterRoutes(api)
 		userHandler.RegisterRoutes(api)
-		friendHandler.RegisterRoutes(api)
 		channelHandler.RegisterRoutes(api)
 	}
 
