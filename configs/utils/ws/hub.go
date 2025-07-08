@@ -1,9 +1,11 @@
 package ws
 
 import (
+	"chat-service/internal/models"
 	"context"
 	"encoding/json"
 	"log"
+	"strconv"
 	"sync"
 	"time"
 
@@ -25,8 +27,8 @@ type Hub struct {
 // ChannelMessage represents a message to be broadcasted to a specific channel
 // Used for internal communication between hub components
 type ChannelMessage struct {
-	ChannelID string `json:"channelId"` // Target channel identifier
-	Data      []byte `json:"data"`      // Serialized message data
+	ChannelID uint   `json:"channelId"` // Target channel identifier
+	Data      []byte `json:"data"`      // Serialized message data (JSON)
 }
 
 // WsNewHub creates and initializes a new Hub instance
@@ -70,7 +72,7 @@ func (h *Hub) WsRun() {
 		case msg := <-h.Broadcast:
 			// Broadcast message to Redis for cross-instance distribution
 			ctx := context.Background()
-			if err := h.Redis.Publish(ctx, "channel:"+msg.ChannelID, msg.Data).Err(); err != nil {
+			if err := h.Redis.Publish(ctx, "channel:"+strconv.Itoa(int(msg.ChannelID)), msg.Data).Err(); err != nil {
 				log.Printf("Redis publish error: %v", err)
 			} else {
 				log.Printf("Message published to Redis channel: channel:%s", msg.ChannelID)
@@ -121,7 +123,12 @@ func (h *Hub) wsRedisListener() {
 		for client := range h.Clients {
 			client.mu.Lock()
 			// Check if client is subscribed to this channel
-			if _, ok := client.Channels[channelID]; ok {
+			channelIDUint, err := strconv.ParseUint(channelID, 10, 64)
+			if err != nil {
+				log.Printf("Failed to parse channel ID from Redis message: %v", err)
+				continue
+			}
+			if _, ok := client.Channels[uint(channelIDUint)]; ok {
 				// Send message to client via WebSocket
 				if err := client.Conn.WriteMessage(websocket.TextMessage, []byte(msg.Payload)); err != nil {
 					log.Printf("Write error: %v", err)
@@ -141,13 +148,13 @@ func (h *Hub) wsRedisListener() {
 
 // WsAddChannel subscribes a client to a specific channel
 // Thread-safe operation that adds the channel to the client's subscription list
-func (c *Client) WsAddChannel(channelID string) {
+func (c *Client) WsAddChannel(channelID uint) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	// Initialize channels map if not already done
 	if c.Channels == nil {
-		c.Channels = make(map[string]bool)
+		c.Channels = make(map[uint]bool)
 	}
 	c.Channels[channelID] = true
 	log.Printf("Client %d subscribed to channel %s", c.ID, channelID)
@@ -155,7 +162,7 @@ func (c *Client) WsAddChannel(channelID string) {
 
 // WsRemoveChannel unsubscribes a client from a specific channel
 // Thread-safe operation that removes the channel from the client's subscription list
-func (c *Client) WsRemoveChannel(channelID string) {
+func (c *Client) WsRemoveChannel(channelID uint) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.Channels, channelID)
@@ -193,7 +200,7 @@ func (c *Client) WsHandleIncomingMessages(hub *Hub) {
 		// Parse incoming JSON message
 		var msgData struct {
 			Action    string `json:"action"`    // Message action: "join", "leave", or "message"
-			ChannelID string `json:"channelId"` // Target channel identifier
+			ChannelID uint   `json:"channelId"` // Target channel identifier
 			Text      string `json:"text"`      // Message text (for "message" action)
 		}
 
@@ -225,12 +232,12 @@ func (c *Client) WsHandleIncomingMessages(hub *Hub) {
 			log.Printf("💬 Client %d: Sending message to channel %s: %s", c.ID, msgData.ChannelID, msgData.Text)
 
 			fullMsg := struct {
-				ChannelID string `json:"channelId"` // Target channel
+				ChannelID uint   `json:"channelId"` // Target channel
 				UserID    uint   `json:"userId"`    // Sender's user ID
 				Text      string `json:"text"`      // Message content
 				SentAt    string `json:"sentAt"`    // Timestamp in RFC3339 format
 			}{
-				ChannelID: msgData.ChannelID,
+				ChannelID: uint(msgData.ChannelID),
 				UserID:    c.ID,
 				Text:      msgData.Text,
 				SentAt:    time.Now().Format(time.RFC3339),
@@ -241,7 +248,7 @@ func (c *Client) WsHandleIncomingMessages(hub *Hub) {
 			log.Printf("📤 Client %d: Broadcasting message to channel %s: %s", c.ID, msgData.ChannelID, string(msgBytes))
 
 			hub.Broadcast <- ChannelMessage{
-				ChannelID: msgData.ChannelID,
+				ChannelID: uint(msgData.ChannelID),
 				Data:      msgBytes,
 			}
 			log.Printf("✅ Client %d: Message queued for broadcasting to channel %s", c.ID, msgData.ChannelID)
@@ -252,4 +259,16 @@ func (c *Client) WsHandleIncomingMessages(hub *Hub) {
 	}
 
 	log.Printf("🔴 Client %d: Message handler stopped", c.ID)
+}
+
+func (h *Hub) BroadcastMessage(msg *models.Chat) {
+	msgBytes, err := json.Marshal(msg)
+	if err != nil {
+		log.Printf("Failed to marshal chat message: %v", err)
+		return
+	}
+	h.Broadcast <- ChannelMessage{
+		ChannelID: msg.ChannelID,
+		Data:      msgBytes,
+	}
 }

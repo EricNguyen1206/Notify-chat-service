@@ -22,8 +22,7 @@ type Chat struct {
 	SenderID uint   `gorm:"not null" json:"senderId"`
 	Type     string `gorm:"not null;type:varchar(20);check:type IN ('direct', 'channel')" json:"type"` // Use consts
 
-	ReceiverID *uint `gorm:"type:uint" json:"receiverId"` // only if type == direct
-	ChannelID  *uint `gorm:"type:uint" json:"channelId"`  // only if type == channel
+	ChannelID uint `gorm:"type:uint" json:"channelId"` // only if type == channel
 
 	Text     *string `json:"text,omitempty"`     // optional
 	URL      *string `json:"url,omitempty"`      // optional

@@ -11,6 +11,6 @@ import (
 type Client struct {
 	ID       uint            // UserID - unique identifier for the user
 	Conn     *websocket.Conn // WebSocket connection instance
-	Channels map[string]bool // Set of channel IDs the client is subscribed to (using map for O(1) lookup)
+	Channels map[uint]bool   // Set of channel IDs the client is subscribed to (using map for O(1) lookup)
 	mu       sync.Mutex      // Mutex for thread-safe access to client data
 }

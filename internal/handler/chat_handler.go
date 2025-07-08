@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"chat-service/configs/middleware"
+	"chat-service/configs/utils/ws"
 	"chat-service/internal/models"
 	"chat-service/internal/repository"
 	"chat-service/internal/service"
@@ -15,10 +16,11 @@ import (
 type ChatHandler struct {
 	channelService *service.ChannelService
 	chatRepo       *repository.ChatRepository
+	hub            *ws.Hub
 }
 
-func NewChatHandler(channelService *service.ChannelService, chatRepo *repository.ChatRepository) *ChatHandler {
-	return &ChatHandler{channelService: channelService, chatRepo: chatRepo}
+func NewChatHandler(channelService *service.ChannelService, chatRepo *repository.ChatRepository, hub *ws.Hub) *ChatHandler {
+	return &ChatHandler{channelService: channelService, chatRepo: chatRepo, hub: hub}
 }
 
 // RegisterRoutes maps HTTP methods to handler functions
@@ -81,7 +83,7 @@ func (h *ChatHandler) GetChannelMessages(c *gin.Context) {
 			URL:        m.URL,
 			FileName:   m.FileName,
 			CreatedAt:  m.CreatedAt,
-			ChannelID:  m.ChannelID,
+			ChannelID:  &m.ChannelID,
 		})
 	}
 	c.JSON(http.StatusOK, responses)
@@ -108,18 +110,21 @@ func (h *ChatHandler) CreateChatMessage(c *gin.Context) {
 		return
 	}
 	chat := &models.Chat{
-		SenderID:   userID,
-		Type:       req.Type,
-		ReceiverID: req.ReceiverID,
-		ChannelID:  req.ChannelID,
-		Text:       req.Text,
-		URL:        req.URL,
-		FileName:   req.FileName,
+		SenderID:  userID,
+		Type:      req.Type,
+		ChannelID: *req.ChannelID,
+		Text:      req.Text,
+		URL:       req.URL,
+		FileName:  req.FileName,
 	}
 	if err := h.chatRepo.Create(chat); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create chat message"})
 		return
 	}
+
+	// Send message to WebSocket clients
+	h.hub.BroadcastMessage(chat)
+
 	// Optionally preload sender for response
 	response := models.ChatResponse{
 		ID:         chat.ID,
@@ -130,8 +135,7 @@ func (h *ChatHandler) CreateChatMessage(c *gin.Context) {
 		URL:        chat.URL,
 		FileName:   chat.FileName,
 		CreatedAt:  chat.CreatedAt,
-		ReceiverID: chat.ReceiverID,
-		ChannelID:  chat.ChannelID,
+		ChannelID:  &chat.ChannelID,
 	}
 	c.JSON(http.StatusCreated, response)
 }
