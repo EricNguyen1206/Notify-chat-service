@@ -53,7 +53,7 @@ func (h *UserHandler) Register(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param request body models.LoginRequest true "User login credentials"
-// @Success 200 {object} map[string]string "Login successful - returns JWT token"
+// @Success 200 {object} models.LoginResponse "Login successful - returns JWT token and user data"
 // @Failure 400 {object} map[string]interface{} "Bad request - invalid input data"
 // @Failure 401 {object} map[string]interface{} "Unauthorized - invalid credentials"
 // @Failure 500 {object} map[string]interface{} "Internal server error"
@@ -71,7 +71,13 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"token": token})
+	user, err := h.userService.GetUserByEmail(c.Request.Context(), req.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"token": token, "user": user})
 }
 
 // GetProfile godoc

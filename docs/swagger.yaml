@@ -81,6 +81,13 @@ definitions:
     - email
     - password
     type: object
+  models.LoginResponse:
+    properties:
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/models.UserResponse'
+    type: object
   models.RegisterRequest:
     properties:
       email:
@@ -120,11 +127,9 @@ paths:
       - application/json
       responses:
         "200":
-          description: Login successful - returns JWT token
+          description: Login successful - returns JWT token and user data
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/models.LoginResponse'
         "400":
           description: Bad request - invalid input data
           schema:

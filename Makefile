@@ -61,4 +61,9 @@ watch:
             fi; \
         fi
 
+# Generate Swagger and API documentation
+swagger:
+	@echo "Generating Swagger and API docs..."
+	@swag init -g cmd/api/main.go -o docs
+
 .PHONY: all build run test clean watch docker-run docker-down itest
