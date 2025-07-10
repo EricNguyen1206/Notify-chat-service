@@ -26,6 +26,7 @@ type UserService interface {
 	Register(ctx context.Context, req *models.RegisterRequest) (*models.UserResponse, error)
 	Login(ctx context.Context, req *models.LoginRequest) (string, error)
 	GetProfile(ctx context.Context, userID uint) (*models.UserResponse, error)
+	GetUserByEmail(ctx context.Context, email string) (*models.UserResponse, error)
 }
 
 type userService struct {
@@ -112,6 +113,19 @@ func (s *userService) GetProfile(ctx context.Context, userID uint) (*models.User
 		return nil, ErrUserNotFound
 	}
 
+	return &models.UserResponse{
+		ID:        user.ID,
+		Email:     user.Email,
+		Username:  user.Username,
+		CreatedAt: user.CreatedAt,
+	}, nil
+}
+
+func (s *userService) GetUserByEmail(ctx context.Context, email string) (*models.UserResponse, error) {
+	user, err := s.repo.FindByEmail(ctx, email)
+	if err != nil {
+		return nil, ErrUserNotFound
+	}
 	return &models.UserResponse{
 		ID:        user.ID,
 		Email:     user.Email,

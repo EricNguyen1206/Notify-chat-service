@@ -37,3 +37,10 @@ type UserResponse struct {
 	Username  string    `json:"username"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+// LoginResponse represents the response for a successful login
+// swagger:model
+type LoginResponse struct {
+	Token string       `json:"token"`
+	User  UserResponse `json:"user"`
+}
