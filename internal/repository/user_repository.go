@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"gorm.io/gorm"
@@ -20,22 +21,28 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 }
 
 func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
+	log.Printf("🔄 Repository: Starting user creation for email: %s", user.Email)
+
 	// Begin transaction
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		// Check email exist
+		// Check email existence with better error handling
 		var existingUser models.User
 		if err := tx.Where("email = ? AND deleted_at IS NULL", user.Email).First(&existingUser).Error; err == nil {
+			log.Printf("❌ Repository: Email already exists - %s", user.Email)
 			return errors.New("email already exists")
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
+			log.Printf("❌ Repository: Database error checking email existence - %s: %v", user.Email, err)
+			return fmt.Errorf("failed to check email existence: %w", err)
 		}
 
 		// Create user in transaction
 		if err := tx.Create(user).Error; err != nil {
+			log.Printf("❌ Repository: Failed to create user - %s: %v", user.Email, err)
 			// Transaction auto rollback if err
-			return errors.New("failed to create user: " + err.Error())
+			return fmt.Errorf("failed to create user: %w", err)
 		}
 
+		log.Printf("✅ Repository: User created successfully - ID: %d, Email: %s", user.ID, user.Email)
 		// Transaction commit if not err
 		return nil
 	})

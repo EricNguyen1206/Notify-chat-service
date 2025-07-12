@@ -4,6 +4,7 @@ import (
 	"chat-service/configs/middleware"
 	"chat-service/internal/models"
 	"chat-service/internal/service"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -33,16 +34,30 @@ func NewUserHandler(userService service.UserService, redisClient *redis.Client) 
 func (h *UserHandler) Register(c *gin.Context) {
 	var req models.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		log.Printf("❌ Handler: Registration validation failed: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input data", "details": err.Error()})
 		return
 	}
+
+	log.Printf("🔄 Handler: Processing registration request for email: %s", req.Email)
 
 	user, err := h.userService.Register(c.Request.Context(), &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("❌ Handler: Registration failed for email %s: %v", req.Email, err)
+
+		// Handle specific error types
+		switch err.Error() {
+		case "user already exists":
+			c.JSON(http.StatusConflict, gin.H{"error": "User with this email already exists"})
+		case "invalid request":
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register user"})
+		}
 		return
 	}
 
+	log.Printf("✅ Handler: Registration successful for user ID: %d, Email: %s", user.ID, user.Email)
 	c.JSON(http.StatusCreated, user)
 }
 

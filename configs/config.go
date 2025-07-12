@@ -14,6 +14,19 @@ import (
 	"gorm.io/gorm"
 )
 
+// maskPassword masks the password in a database URL for safe logging
+func maskPassword(dsn string) string {
+	if dsn == "" {
+		return ""
+	}
+	// Simple masking - replace password with ***
+	// This is a basic implementation, in production you might want more sophisticated masking
+	if len(dsn) > 20 {
+		return dsn[:20] + "***"
+	}
+	return "***"
+}
+
 // Config holds all configuration values
 type Config struct {
 	Port             string
@@ -40,6 +53,11 @@ var (
 func Load() *Config {
 	once.Do(func() {
 		// Viper setup
+		viper.SetConfigName(".env")
+		viper.SetConfigType("env")
+		viper.AddConfigPath(".")
+
+		// Set defaults
 		viper.SetDefault("NOTIFY_PORT", "8080")
 		viper.SetDefault("NOTIFY_JWT_SECRET", "secret")
 		viper.SetDefault("NOTIFY_JWT_EXPIRE", "24h")
@@ -50,6 +68,12 @@ func Load() *Config {
 		viper.SetDefault("POSTGRES_PORT", "5432")
 		viper.SetDefault("POSTGRES_DB", "postgres")
 		viper.AutomaticEnv()
+
+		// Read the .env file
+		if err := viper.ReadInConfig(); err != nil {
+			log.Printf("Warning: Error reading .env file: %v", err)
+			log.Printf("Using environment variables and defaults")
+		}
 
 		// App
 		appPort := viper.GetString("NOTIFY_PORT")
@@ -64,13 +88,27 @@ func Load() *Config {
 		redisURL := viper.GetString("REDIS_URL")
 		redisClient, _ := database.InitRedis(redisURL)
 
-		// Postgres
-		pgUser := viper.GetString("POSTGRES_USER")
-		pgPassword := viper.GetString("POSTGRES_PASSWORD")
-		pgHost := viper.GetString("POSTGRES_HOST")
-		pgPort := viper.GetString("POSTGRES_PORT")
-		pgDB := viper.GetString("POSTGRES_DB")
-		postgresDB, _ := database.NewPostgresConnection(pgUser, pgPassword, pgHost, pgPort, pgDB)
+		// Postgres - try DATABASE_URL first, then fallback to individual components
+		databaseURL := viper.GetString("DATABASE_URL")
+		var postgresDB *gorm.DB
+		
+		if databaseURL != "" {
+			log.Printf("Using DATABASE_URL: %s", maskPassword(databaseURL))
+			postgresDB, err = database.NewPostgresConnectionWithURL(databaseURL)
+		} else {
+			log.Printf("Using individual database configuration")
+			pgUser := viper.GetString("POSTGRES_USER")
+			pgPassword := viper.GetString("POSTGRES_PASSWORD")
+			pgHost := viper.GetString("POSTGRES_HOST")
+			pgPort := viper.GetString("POSTGRES_PORT")
+			pgDB := viper.GetString("POSTGRES_DB")
+			log.Printf("DB Config - Host: %s, User: %s, Port: %s, DB: %s", pgHost, pgUser, pgPort, pgDB)
+			postgresDB, err = database.NewPostgresConnection(pgUser, pgPassword, pgHost, pgPort, pgDB)
+		}
+		if err != nil {
+			log.Fatalf("❌ Failed to connect to database: %v", err)
+		}
+		log.Printf("✅ Database connection established successfully")
 
 		upgrader := websocket.Upgrader{
 			ReadBufferSize:  1024,
@@ -82,19 +120,14 @@ func Load() *Config {
 		wsHub := ws.WsNewHub(redisClient)
 
 		ConfigInstance = &Config{
-			Port:             appPort,
-			JWTSecret:        appJWTSecret,
-			JWTExpire:        appJWTExpire,
-			DB:               postgresDB,
-			Redis:            redisClient,
-			RedisURL:         redisURL,
-			PostgresUser:     pgUser,
-			PostgresPassword: pgPassword,
-			PostgresHost:     pgHost,
-			PostgresPort:     pgPort,
-			PostgresDB:       pgDB,
-			WSUpgrader:       upgrader,
-			WSHub:            wsHub,
+			Port:       appPort,
+			JWTSecret:  appJWTSecret,
+			JWTExpire:  appJWTExpire,
+			DB:         postgresDB,
+			Redis:      redisClient,
+			RedisURL:   redisURL,
+			WSUpgrader: upgrader,
+			WSHub:      wsHub,
 		}
 	})
 	return ConfigInstance
