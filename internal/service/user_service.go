@@ -6,12 +6,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 )
 
 // Custom errors
@@ -59,32 +59,38 @@ func (s *userService) generateJWT(user *models.User) (string, error) {
 
 func (s *userService) Register(ctx context.Context, req *models.RegisterRequest) (*models.UserResponse, error) {
 	// Validate request
-	if req.Email == "" || req.Password == "" {
+	if req.Email == "" || req.Password == "" || req.Username == "" {
+		log.Printf("❌ Registration failed: invalid request - email: %s, username: %s", req.Email, req.Username)
 		return nil, ErrInvalidRequest
 	}
 
-	// Use a session to prevent prepared statement issues
-	existingUser, err := s.repo.FindByEmail(ctx, req.Email)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, fmt.Errorf("failed to check existing user: %w", err)
-	}
-	if existingUser != nil {
-		return nil, ErrUserAlreadyExists
-	}
+	log.Printf("🔄 Starting registration process for email: %s, username: %s", req.Email, req.Username)
 
 	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
+		log.Printf("❌ Registration failed: password hashing error for email %s: %v", req.Email, err)
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	// Create user with UUID
-	user := models.User{Username: req.Username, Email: req.Email, Password: string(hashedPassword)}
+	// Create user object
+	user := models.User{
+		Username: req.Username,
+		Email:    req.Email,
+		Password: string(hashedPassword),
+	}
 
-	// Create user in database
+	// Create user in database (repository handles email uniqueness check)
 	if err := s.repo.Create(ctx, &user); err != nil {
+		if errors.Is(err, errors.New("email already exists")) {
+			log.Printf("❌ Registration failed: email already exists - %s", req.Email)
+			return nil, ErrUserAlreadyExists
+		}
+		log.Printf("❌ Registration failed: database error for email %s: %v", req.Email, err)
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
+
+	log.Printf("✅ User registered successfully - ID: %d, Email: %s, Username: %s", user.ID, user.Email, user.Username)
 
 	return &models.UserResponse{
 		ID:        user.ID,
