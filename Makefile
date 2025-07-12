@@ -6,6 +6,7 @@ all: build test
 build:
 	@echo "Building..."
 	
+	@go mod download
 	
 	@go build -o main cmd/api/main.go
 
