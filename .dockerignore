@@ -1,0 +1,49 @@
+# Git
+.git
+.gitignore
+README.md
+CORS_CONFIG.md
+
+# Environment files (except production)
+.env
+.env.example
+.env.leapcell
+
+# Development files
+.air.toml
+tmp/
+*.log
+
+# Build artifacts
+main
+notify-chat-linux
+*.exe
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Testing
+test/
+*_test.go
+coverage.out
+
+# Documentation
+docs/swagger.yaml
+docs/swagger.json
+docs/docs.go
+
+# Local development
+node_modules/
+*.local
+
+# Kubernetes/Docker Compose
+k8s-deployment.yaml
+docker-compose.prod.yml
+nginx.conf
+notify-chat.service

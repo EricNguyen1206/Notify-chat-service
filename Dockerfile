@@ -25,7 +25,14 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/api/main.go
 # ================================================
 # RUNTIME STAGE (uses minimal Alpine image)
 # ================================================
-FROM golang:1.23-alpine
+FROM alpine:latest
+
+# Install ca-certificates for HTTPS connections
+RUN apk --no-cache add ca-certificates tzdata
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
 
 # Set working directory
 WORKDIR /app
@@ -34,9 +41,18 @@ WORKDIR /app
 # (reduces final image size by excluding build tools)
 COPY --from=builder /app/main .
 
+# Change ownership to non-root user
+RUN chown -R appuser:appgroup /app
+
+# Switch to non-root user
+USER appuser
+
 # Expose the default application port
-# (change this if your app uses a different port)
 EXPOSE 8080
+
+# Health check for container orchestration
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1
 
 # Command to run the application when container starts
 CMD ["./main"]

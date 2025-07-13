@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notify-chat-service
+  labels:
+    app: notify-chat
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: notify-chat
+  template:
+    metadata:
+      labels:
+        app: notify-chat
+    spec:
+      containers:
+      - name: notify-chat
+        image: notify-chat-service:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: GIN_MODE
+          value: "release"
+        envFrom:
+        - secretRef:
+            name: notify-chat-secrets
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notify-chat-service
+spec:
+  selector:
+    app: notify-chat
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: notify-chat-secrets
+type: Opaque
+stringData:
+  NOTIFY_JWT_SECRET: "your-production-jwt-secret"
+  DATABASE_URL: "your-production-database-url"
+  REDIS_URL: "your-production-redis-url"
