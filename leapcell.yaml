@@ -1,0 +1,57 @@
+# Leapcell deployment configuration
+apiVersion: v1
+kind: Service
+metadata:
+  name: notify-chat-service
+spec:
+  # Application configuration
+  app:
+    name: notify-chat-service
+    port: 8080
+    healthCheck: /api/health
+    
+  # Build configuration
+  build:
+    dockerfile: Dockerfile
+    context: .
+    
+  # Environment variables
+  env:
+    - name: GIN_MODE
+      value: "release"
+    - name: NOTIFY_PORT
+      value: "8080"
+    - name: ALLOWED_ORIGINS
+      value: "http://localhost:3000,https://localhost:3000,https://notify-chat.netlify.app"
+    # Add your production database and Redis URLs
+    - name: DATABASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: database-secrets
+          key: url
+    - name: REDIS_URL
+      valueFrom:
+        secretKeyRef:
+          name: redis-secrets
+          key: url
+    - name: NOTIFY_JWT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: app-secrets
+          key: jwt-secret
+          
+  # Resource configuration
+  resources:
+    cpu: "0.5"
+    memory: "512Mi"
+    
+  # Scaling configuration
+  scaling:
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPU: 70
+    
+  # Domain configuration
+  domains:
+    - name: your-api-domain.leapcell.io
+      ssl: true

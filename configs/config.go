@@ -4,7 +4,6 @@ import (
 	"chat-service/configs/database"
 	"chat-service/configs/utils/ws"
 	"log"
-	"net/http"
 	"sync"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
 )
-
 // maskPassword masks the password in a database URL for safe logging
 func maskPassword(dsn string) string {
 	if dsn == "" {
@@ -91,7 +89,7 @@ func Load() *Config {
 		// Postgres - try DATABASE_URL first, then fallback to individual components
 		databaseURL := viper.GetString("DATABASE_URL")
 		var postgresDB *gorm.DB
-		
+
 		if databaseURL != "" {
 			log.Printf("Using DATABASE_URL: %s", maskPassword(databaseURL))
 			postgresDB, err = database.NewPostgresConnectionWithURL(databaseURL)
@@ -110,13 +108,7 @@ func Load() *Config {
 		}
 		log.Printf("✅ Database connection established successfully")
 
-		upgrader := websocket.Upgrader{
-			ReadBufferSize:  1024,
-			WriteBufferSize: 1024,
-			// Allow all origin connect to websocket
-			// TODO: fix in production
-			CheckOrigin: func(r *http.Request) bool { return true },
-		}
+		// Use the centralized WebSocket upgrader with proper origin checking
 		wsHub := ws.WsNewHub(redisClient)
 
 		ConfigInstance = &Config{
@@ -126,7 +118,7 @@ func Load() *Config {
 			DB:         postgresDB,
 			Redis:      redisClient,
 			RedisURL:   redisURL,
-			WSUpgrader: upgrader,
+			WSUpgrader: ws.Upgrader,
 			WSHub:      wsHub,
 		}
 	})

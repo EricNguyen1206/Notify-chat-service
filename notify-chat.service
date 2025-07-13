@@ -1,0 +1,29 @@
+[Unit]
+Description=Notify Chat Service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=notify
+Group=notify
+WorkingDirectory=/opt/notify-chat
+ExecStart=/opt/notify-chat/notify-chat-linux
+Restart=always
+RestartSec=5s
+Environment=GIN_MODE=release
+EnvironmentFile=/opt/notify-chat/.env
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/notify-chat
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target
