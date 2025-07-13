@@ -48,6 +48,7 @@ func NewApp() (*App, error) {
 	// Repository
 	userRepo := repository.NewUserRepository(config.DB)
 	channelRepo := repository.NewChannelRepository(config.DB)
+	chatRepo := repository.NewChatRepository(config.DB)
 
 	// Service
 	userService := service.NewUserService(userRepo, config.JWTSecret, config.Redis)
@@ -56,6 +57,7 @@ func NewApp() (*App, error) {
 	// Handler
 	userHandler := handler.NewUserHandler(userService, config.Redis)
 	channelHandler := handler.NewChannelHandler(channelService)
+	chatHandler := handler.NewChatHandler(channelService, chatRepo, config.WSHub)
 
 	wsHandler := handler.NewWSHandler(config.WSHub)
 
@@ -75,6 +77,7 @@ func NewApp() (*App, error) {
 		wsHandler.RegisterRoutes(api)
 		userHandler.RegisterRoutes(api)
 		channelHandler.RegisterRoutes(api)
+		chatHandler.RegisterRoutes(api)
 	}
 
 	// Swagger documentation (only in development)
