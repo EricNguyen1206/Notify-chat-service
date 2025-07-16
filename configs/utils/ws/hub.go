@@ -75,7 +75,7 @@ func (h *Hub) WsRun() {
 			if err := h.Redis.Publish(ctx, "channel:"+strconv.Itoa(int(msg.ChannelID)), msg.Data).Err(); err != nil {
 				log.Printf("Redis publish error: %v", err)
 			} else {
-				log.Printf("Message published to Redis channel: channel:%s", msg.ChannelID)
+				log.Printf("Message published to Redis channel: channel:%d", msg.ChannelID)
 			}
 
 			// Also broadcast directly to local clients for immediate delivery
@@ -92,13 +92,13 @@ func (h *Hub) WsRun() {
 						h.Unregister <- client
 					} else {
 						clientCount++
-						log.Printf("Message sent to client %d in channel %s", client.ID, msg.ChannelID)
+						log.Printf("Message sent to client %d in channel %d", client.ID, msg.ChannelID)
 					}
 				}
 				client.mu.Unlock()
 			}
 			h.mu.RUnlock()
-			log.Printf("Message broadcasted to %d local clients in channel %s", clientCount, msg.ChannelID)
+			log.Printf("Message broadcasted to %d local clients in channel %d", clientCount, msg.ChannelID)
 		}
 	}
 }
@@ -157,7 +157,7 @@ func (c *Client) WsAddChannel(channelID uint) {
 		c.Channels = make(map[uint]bool)
 	}
 	c.Channels[channelID] = true
-	log.Printf("Client %d subscribed to channel %s", c.ID, channelID)
+	log.Printf("Client %d subscribed to channel %d", c.ID, channelID)
 }
 
 // WsRemoveChannel unsubscribes a client from a specific channel
@@ -166,7 +166,7 @@ func (c *Client) WsRemoveChannel(channelID uint) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.Channels, channelID)
-	log.Printf("Client %d unsubscribed from channel %s", c.ID, channelID)
+	log.Printf("Client %d unsubscribed from channel %d", c.ID, channelID)
 }
 
 // WsHandleIncomingMessages processes incoming WebSocket messages from a client
@@ -210,26 +210,26 @@ func (c *Client) WsHandleIncomingMessages(hub *Hub) {
 			continue
 		}
 
-		log.Printf("✅ Client %d: JSON decoded successfully - Action: %s, ChannelID: %s, Text: %s",
+		log.Printf("✅ Client %d: JSON decoded successfully - Action: %s, ChannelID: %d, Text: %s",
 			c.ID, msgData.Action, msgData.ChannelID, msgData.Text)
 
 		// Handle different message actions
 		switch msgData.Action {
 		case "join":
 			// Subscribe client to the specified channel
-			log.Printf("🟢 Client %d: Attempting to join channel %s", c.ID, msgData.ChannelID)
+			log.Printf("🟢 Client %d: Attempting to join channel %d", c.ID, msgData.ChannelID)
 			c.WsAddChannel(msgData.ChannelID)
-			log.Printf("✅ Client %d: Successfully joined channel %s", c.ID, msgData.ChannelID)
+			log.Printf("✅ Client %d: Successfully joined channel %d", c.ID, msgData.ChannelID)
 
 		case "leave":
 			// Unsubscribe client from the specified channel
-			log.Printf("🟡 Client %d: Attempting to leave channel %s", c.ID, msgData.ChannelID)
+			log.Printf("🟡 Client %d: Attempting to leave channel %d", c.ID, msgData.ChannelID)
 			c.WsRemoveChannel(msgData.ChannelID)
-			log.Printf("✅ Client %d: Successfully left channel %s", c.ID, msgData.ChannelID)
+			log.Printf("✅ Client %d: Successfully left channel %d", c.ID, msgData.ChannelID)
 
 		case "message":
 			// Create a complete message structure with metadata
-			log.Printf("💬 Client %d: Sending message to channel %s: %s", c.ID, msgData.ChannelID, msgData.Text)
+			log.Printf("💬 Client %d: Sending message to channel %d: %s", c.ID, msgData.ChannelID, msgData.Text)
 
 			fullMsg := struct {
 				ChannelID uint   `json:"channelId"` // Target channel
@@ -245,13 +245,13 @@ func (c *Client) WsHandleIncomingMessages(hub *Hub) {
 
 			// Serialize and broadcast the message
 			msgBytes, _ := json.Marshal(fullMsg)
-			log.Printf("📤 Client %d: Broadcasting message to channel %s: %s", c.ID, msgData.ChannelID, string(msgBytes))
+			log.Printf("📤 Client %d: Broadcasting message to channel %d: %s", c.ID, msgData.ChannelID, string(msgBytes))
 
 			hub.Broadcast <- ChannelMessage{
 				ChannelID: uint(msgData.ChannelID),
 				Data:      msgBytes,
 			}
-			log.Printf("✅ Client %d: Message queued for broadcasting to channel %s", c.ID, msgData.ChannelID)
+			log.Printf("✅ Client %d: Message queued for broadcasting to channel %d", c.ID, msgData.ChannelID)
 
 		default:
 			log.Printf("⚠️ Client %d: Unknown action '%s' received", c.ID, msgData.Action)
