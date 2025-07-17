@@ -68,11 +68,12 @@ func NewApp() (*App, error) {
 	router.Use(middleware.CORS())
 	router.Use(middleware.LogApi())
 
+	router.GET("/kaithhealthcheck", healthCheck)
+
 	// Register API routes
 	api := router.Group("/api")
 	{
 		// Health check endpoint
-		api.GET("/health", healthCheck)
 		// WebSocket routes
 		wsHandler.RegisterRoutes(api)
 		userHandler.RegisterRoutes(api)

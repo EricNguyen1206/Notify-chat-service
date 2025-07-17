@@ -4,67 +4,16 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/gorilla/websocket"
-	"github.com/redis/go-redis/v9"
 )
 
-const TEST_MSG = "test message"
-
-// Mock WebSocket connection for testing
-type mockConn struct {
-	messages [][]byte
-	closed   bool
-	mu       sync.Mutex
-}
-
-func (m *mockConn) WriteMessage(messageType int, data []byte) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.closed {
-		return websocket.ErrCloseSent
-	}
-	m.messages = append(m.messages, data)
-	return nil
-}
-
-func (m *mockConn) Close() error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.closed = true
-	return nil
-}
-
-func (m *mockConn) ReadMessage() (messageType int, p []byte, err error) {
-	return 0, nil, nil
-}
-
-func (m *mockConn) getMessages() [][]byte {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	result := make([][]byte, len(m.messages))
-	copy(result, m.messages)
-	return result
-}
-
-// Helper function to create a test client with mock connection
-func createTestClient(userID uint) *Client {
-	return &Client{
-		ID:       userID,
-		Conn:     &mockConn{messages: make([][]byte, 0)},
-		Channels: make(map[uint]bool),
-	}
-}
-
-// Helper function to create a test hub
-func createTestHub() *Hub {
-	// Create a mock Redis client (we won't actually use Redis in these tests)
-	redisClient := redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
-	})
-
-	return WsNewHub(redisClient)
-}
+const (
+	TEST_MSG                      = "test message"
+	ERR_NOT_MOCK_CONN             = "Client %d connection is not a mockConn"
+	ERR_CONN_SHOULD_EXIST         = "Connection metadata should exist"
+	ERR_CLIENT_NOT_MOCK_CONN      = "Client connection is not a mockConn"
+	ERR_CLIENT_RECEIVE_MSG        = "Client %d should receive 1 message, got %d"
+	ERR_CLIENT_SHOULD_RECEIVE_MSG = "Client should receive 1 message, got %d"
+)
 
 func TestNewUserConnectionCache(t *testing.T) {
 	hub := createTestHub()
@@ -107,7 +56,7 @@ func TestAddConnection(t *testing.T) {
 	// Verify metadata was created
 	metadata, exists := cache.GetConnectionMetadata(1)
 	if !exists {
-		t.Error("Connection metadata should exist")
+		t.Error(ERR_CONN_SHOULD_EXIST)
 	}
 
 	if metadata.UserID != 1 {
@@ -407,13 +356,13 @@ func TestBroadcastToChannel(t *testing.T) {
 	for i, client := range clients {
 		mockConn, ok := client.Conn.(*mockConn)
 		if !ok {
-			t.Errorf("Client %d connection is not a mockConn", i+1)
+			t.Errorf(ERR_NOT_MOCK_CONN, i+1)
 			continue
 		}
 		messages := mockConn.getMessages()
 
 		if len(messages) != 1 {
-			t.Errorf("Client %d should receive 1 message, got %d", i+1, len(messages))
+			t.Errorf(ERR_CLIENT_RECEIVE_MSG, i+1, len(messages))
 			continue
 		}
 
@@ -443,13 +392,13 @@ func TestBroadcastToUser(t *testing.T) {
 	// Verify client received the message
 	mockConn, ok := client.Conn.(*mockConn)
 	if !ok {
-		t.Error("Client connection is not a mockConn")
+		t.Error(ERR_CLIENT_NOT_MOCK_CONN)
 		return
 	}
 	messages := mockConn.getMessages()
 
 	if len(messages) != 1 {
-		t.Errorf("Client should receive 1 message, got %d", len(messages))
+		t.Errorf(ERR_CLIENT_SHOULD_RECEIVE_MSG, len(messages))
 	} else if string(messages[0]) != string(message) {
 		t.Errorf("Client received wrong message: expected %s, got %s",
 			string(message), string(messages[0]))
@@ -481,13 +430,13 @@ func TestBroadcastToUsers(t *testing.T) {
 	for i, client := range clients {
 		mockConn, ok := client.Conn.(*mockConn)
 		if !ok {
-			t.Errorf("Client %d connection is not a mockConn", userIDs[i])
+			t.Errorf(ERR_NOT_MOCK_CONN, userIDs[i])
 			continue
 		}
 		messages := mockConn.getMessages()
 
 		if len(messages) != 1 {
-			t.Errorf("Client %d should receive 1 message, got %d", userIDs[i], len(messages))
+			t.Errorf(ERR_CLIENT_RECEIVE_MSG, userIDs[i], len(messages))
 			continue
 		}
 
@@ -538,7 +487,7 @@ func TestBroadcastWithFailedConnections(t *testing.T) {
 	// Close client2's connection to simulate failure
 	mockConn2, ok := client2.Conn.(*mockConn)
 	if !ok {
-		t.Fatal("Client connection is not a mockConn")
+		t.Fatal(ERR_CLIENT_NOT_MOCK_CONN)
 	}
 	mockConn2.Close()
 
@@ -559,7 +508,7 @@ func TestBroadcastWithFailedConnections(t *testing.T) {
 	// Verify successful client still received message
 	mockConn1, ok := client1.Conn.(*mockConn)
 	if !ok {
-		t.Fatal("Client connection is not a mockConn")
+		t.Fatal(ERR_CLIENT_NOT_MOCK_CONN)
 	}
 	messages := mockConn1.getMessages()
 
@@ -672,7 +621,7 @@ func TestConcurrentBroadcasting(t *testing.T) {
 	for i, client := range clients {
 		mockConn, ok := client.Conn.(*mockConn)
 		if !ok {
-			t.Errorf("Client %d connection is not a mockConn", i+1)
+			t.Errorf(ERR_NOT_MOCK_CONN, i+1)
 			continue
 		}
 		messages := mockConn.getMessages()
@@ -774,12 +723,12 @@ func TestBroadcastWithNilMessage(t *testing.T) {
 	// Verify client received nil message
 	mockConn, ok := client.Conn.(*mockConn)
 	if !ok {
-		t.Fatal("Client connection is not a mockConn")
+		t.Fatal(ERR_CLIENT_NOT_MOCK_CONN)
 	}
 	messages := mockConn.getMessages()
 
 	if len(messages) != 1 {
-		t.Errorf("Client should receive 1 message, got %d", len(messages))
+		t.Errorf(ERR_CLIENT_SHOULD_RECEIVE_MSG, len(messages))
 	} else if messages[0] != nil {
 		t.Error("Client should receive nil message")
 	}
@@ -804,12 +753,12 @@ func TestBroadcastWithEmptyMessage(t *testing.T) {
 	// Verify client received empty message
 	mockConn, ok := client.Conn.(*mockConn)
 	if !ok {
-		t.Fatal("Client connection is not a mockConn")
+		t.Fatal(ERR_CLIENT_NOT_MOCK_CONN)
 	}
 	messages := mockConn.getMessages()
 
 	if len(messages) != 1 {
-		t.Errorf("Client should receive 1 message, got %d", len(messages))
+		t.Errorf(ERR_CLIENT_SHOULD_RECEIVE_MSG, len(messages))
 	} else if len(messages[0]) != 0 {
 		t.Error("Client should receive empty message")
 	}
@@ -835,7 +784,7 @@ func TestChannelSubscriptionCacheUpdates(t *testing.T) {
 	// Verify metadata is updated
 	metadata, exists := hub.ConnectionCache.GetConnectionMetadata(1)
 	if !exists {
-		t.Error("Connection metadata should exist")
+		t.Error(ERR_CONN_SHOULD_EXIST)
 	}
 	if !metadata.Channels[100] {
 		t.Error("Channel should be in user's metadata after WsAddChannel")
@@ -860,6 +809,33 @@ func TestChannelSubscriptionCacheUpdates(t *testing.T) {
 	}
 }
 
+// Helper function to verify a user is in a channel
+func verifyUserInChannel(t *testing.T, hub *Hub, userID uint, channelID uint, shouldBePresent bool) {
+	users := hub.ConnectionCache.GetOnlineUsersInChannel(channelID)
+
+	found := false
+	for _, id := range users {
+		if id == userID {
+			found = true
+			break
+		}
+	}
+
+	if shouldBePresent && !found {
+		t.Errorf("User %d should be in channel %d", userID, channelID)
+	} else if !shouldBePresent && found {
+		t.Errorf("User %d should not be in channel %d", userID, channelID)
+	}
+}
+
+// Helper function to verify channel user count
+func verifyChannelUserCount(t *testing.T, hub *Hub, channelID uint, expectedCount int) {
+	users := hub.ConnectionCache.GetOnlineUsersInChannel(channelID)
+	if len(users) != expectedCount {
+		t.Errorf("Expected %d users in channel %d, got %d", expectedCount, channelID, len(users))
+	}
+}
+
 // Test cache consistency when clients join/leave channels
 func TestCacheConsistencyOnChannelOperations(t *testing.T) {
 	hub := createTestHub()
@@ -872,63 +848,66 @@ func TestCacheConsistencyOnChannelOperations(t *testing.T) {
 	}
 
 	// Test multiple users joining same channel
+	testUsersJoiningChannel(t, hub, clients)
+
+	// Test users joining multiple channels
+	testUserJoiningMultipleChannels(t, hub, clients[0])
+
+	// Test partial channel leaving
+	testPartialChannelLeaving(t, hub, clients)
+
+	// Test all users leaving channel
+	testAllUsersLeavingChannel(t, hub, clients)
+}
+
+// Helper function to test users joining a channel
+func testUsersJoiningChannel(t *testing.T, hub *Hub, clients []*Client) {
 	for i, client := range clients {
 		client.WsAddChannel(200, hub)
 
 		// Verify incremental addition
-		users := hub.ConnectionCache.GetOnlineUsersInChannel(200)
-		if len(users) != i+1 {
-			t.Errorf("Expected %d users in channel after adding client %d, got %d", i+1, i+1, len(users))
-		}
+		verifyChannelUserCount(t, hub, 200, i+1)
 
 		// Verify user is in the list
-		found := false
-		for _, userID := range users {
-			if userID == uint(i+1) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("User %d should be in channel after WsAddChannel", i+1)
-		}
+		verifyUserInChannel(t, hub, uint(i+1), 200, true)
 	}
+}
 
-	// Test users joining multiple channels
-	clients[0].WsAddChannel(201, hub)
-	clients[0].WsAddChannel(202, hub)
+// Helper function to test a user joining multiple channels
+func testUserJoiningMultipleChannels(t *testing.T, hub *Hub, client *Client) {
+	client.WsAddChannel(201, hub)
+	client.WsAddChannel(202, hub)
 
 	// Verify user is in multiple channels
-	metadata, _ := hub.ConnectionCache.GetConnectionMetadata(1)
+	metadata, exists := hub.ConnectionCache.GetConnectionMetadata(client.ID)
+	if !exists {
+		t.Error(ERR_CONN_SHOULD_EXIST)
+		return
+	}
+
 	if !metadata.Channels[200] || !metadata.Channels[201] || !metadata.Channels[202] {
 		t.Error("User should be in all subscribed channels")
 	}
+}
 
-	// Test partial channel leaving
+// Helper function to test partial channel leaving
+func testPartialChannelLeaving(t *testing.T, hub *Hub, clients []*Client) {
 	clients[1].WsRemoveChannel(200, hub)
 
-	// Verify user 2 is removed but others remain
-	users := hub.ConnectionCache.GetOnlineUsersInChannel(200)
-	if len(users) != 2 {
-		t.Errorf("Expected 2 users in channel after removing one, got %d", len(users))
-	}
+	// Verify user count is correct
+	verifyChannelUserCount(t, hub, 200, 2)
 
 	// Verify user 2 is not in the list
-	for _, userID := range users {
-		if userID == 2 {
-			t.Error("User 2 should not be in channel after WsRemoveChannel")
-		}
-	}
+	verifyUserInChannel(t, hub, 2, 200, false)
+}
 
-	// Test all users leaving channel
+// Helper function to test all users leaving a channel
+func testAllUsersLeavingChannel(t *testing.T, hub *Hub, clients []*Client) {
 	clients[0].WsRemoveChannel(200, hub)
 	clients[2].WsRemoveChannel(200, hub)
 
 	// Verify channel is cleaned up
-	users = hub.ConnectionCache.GetOnlineUsersInChannel(200)
-	if len(users) != 0 {
-		t.Error("Channel should be empty after all users leave")
-	}
+	verifyChannelUserCount(t, hub, 200, 0)
 }
 
 // Test concurrent channel subscription operations
