@@ -13,15 +13,21 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// WebSocketConnWrapper wraps gorilla websocket.Conn to implement WebSocketConnection interface
+type WebSocketConnWrapper struct {
+	*websocket.Conn
+}
+
 // Hub manages all WebSocket clients and message broadcasting
 // Acts as a central coordinator for WebSocket connections and Redis pub/sub integration
 type Hub struct {
-	Clients    map[*Client]bool    // Registry of all active WebSocket clients
-	Register   chan *Client        // Channel for registering new clients
-	Unregister chan *Client        // Channel for unregistering/disconnecting clients
-	Broadcast  chan ChannelMessage // Channel for broadcasting messages to Redis
-	Redis      *redis.Client       // Redis client for pub/sub functionality
-	mu         sync.RWMutex        // Read-write mutex for concurrent map access
+	Clients         map[*Client]bool     // Registry of all active WebSocket clients
+	Register        chan *Client         // Channel for registering new clients
+	Unregister      chan *Client         // Channel for unregistering/disconnecting clients
+	Broadcast       chan ChannelMessage  // Channel for broadcasting messages to Redis
+	Redis           *redis.Client        // Redis client for pub/sub functionality
+	ConnectionCache *UserConnectionCache // Connection cache for efficient user presence management
+	mu              sync.RWMutex         // Read-write mutex for concurrent map access
 }
 
 // ChannelMessage represents a message to be broadcasted to a specific channel
@@ -34,13 +40,18 @@ type ChannelMessage struct {
 // WsNewHub creates and initializes a new Hub instance
 // Returns a configured hub ready to handle WebSocket connections
 func WsNewHub(redisClient *redis.Client) *Hub {
-	return &Hub{
+	hub := &Hub{
 		Clients:    make(map[*Client]bool),
 		Register:   make(chan *Client),
 		Unregister: make(chan *Client),
 		Broadcast:  make(chan ChannelMessage),
 		Redis:      redisClient,
 	}
+
+	// Initialize the connection cache with reference to the hub
+	hub.ConnectionCache = NewUserConnectionCache(hub)
+
+	return hub
 }
 
 // WsRun starts the hub's main event loop in a goroutine
@@ -57,6 +68,9 @@ func (h *Hub) WsRun() {
 			h.mu.Lock()
 			h.Clients[client] = true
 			h.mu.Unlock()
+
+			// Add client to connection cache
+			h.ConnectionCache.AddConnection(client)
 			log.Printf("Client registered: %d", client.ID)
 
 		case client := <-h.Unregister:
@@ -69,6 +83,9 @@ func (h *Hub) WsRun() {
 			}
 			h.mu.Unlock()
 
+			// Remove client from connection cache
+			h.ConnectionCache.RemoveConnection(client.ID)
+
 		case msg := <-h.Broadcast:
 			// Broadcast message to Redis for cross-instance distribution
 			ctx := context.Background()
@@ -78,33 +95,14 @@ func (h *Hub) WsRun() {
 				log.Printf("Message published to Redis channel: channel:%d", msg.ChannelID)
 			}
 
-			// Also broadcast directly to local clients for immediate delivery
-			h.mu.RLock()
-			clientCount := 0
-			for client := range h.Clients {
-				client.mu.Lock()
-				// Check if client is subscribed to this channel
-				if _, ok := client.Channels[msg.ChannelID]; ok {
-					// Send message to client via WebSocket
-					if err := client.Conn.WriteMessage(websocket.TextMessage, msg.Data); err != nil {
-						log.Printf("Write error: %v", err)
-						// Handle write error by unregistering the client
-						h.Unregister <- client
-					} else {
-						clientCount++
-						log.Printf("Message sent to client %d in channel %d", client.ID, msg.ChannelID)
-					}
-				}
-				client.mu.Unlock()
-			}
-			h.mu.RUnlock()
-			log.Printf("Message broadcasted to %d local clients in channel %d", clientCount, msg.ChannelID)
+			// Use connection cache for optimized local broadcasting
+			h.broadcastToLocalClients(msg.ChannelID, msg.Data)
 		}
 	}
 }
 
 // wsRedisListener listens for messages from Redis pub/sub channels
-// Distributes messages to all clients subscribed to the respective channels
+// Distributes messages to all clients subscribed to the respective channels using connection cache
 // Enables cross-instance communication when multiple hub instances are running
 func (h *Hub) wsRedisListener() {
 	// Subscribe to all channel messages using wildcard pattern
@@ -114,41 +112,90 @@ func (h *Hub) wsRedisListener() {
 	ch := pubsub.Channel()
 	for msg := range ch {
 		// Extract channelID from Redis channel name (e.g., "channel:123" -> "123")
-		channelID := msg.Channel[6:]
+		channelIDStr := msg.Channel[6:]
 		log.Printf("Received message from Redis channel: %s", msg.Channel)
 
-		// Iterate through all active clients and send message to subscribed ones
-		h.mu.RLock()
-		clientCount := 0
-		for client := range h.Clients {
-			client.mu.Lock()
-			// Check if client is subscribed to this channel
-			channelIDUint, err := strconv.ParseUint(channelID, 10, 64)
-			if err != nil {
-				log.Printf("Failed to parse channel ID from Redis message: %v", err)
-				continue
-			}
-			if _, ok := client.Channels[uint(channelIDUint)]; ok {
-				// Send message to client via WebSocket
-				if err := client.Conn.WriteMessage(websocket.TextMessage, []byte(msg.Payload)); err != nil {
-					log.Printf("Write error: %v", err)
-					// Handle write error by unregistering the client
-					h.Unregister <- client
-				} else {
-					clientCount++
-					log.Printf("Redis message sent to client %d in channel %s", client.ID, channelID)
-				}
-			}
-			client.mu.Unlock()
+		// Parse channel ID
+		channelIDUint, err := strconv.ParseUint(channelIDStr, 10, 64)
+		if err != nil {
+			log.Printf("Failed to parse channel ID from Redis message: %v", err)
+			continue
 		}
-		h.mu.RUnlock()
-		log.Printf("Redis message distributed to %d local clients in channel %s", clientCount, channelID)
+		channelID := uint(channelIDUint)
+
+		// Use connection cache for efficient user lookup and concurrent broadcasting
+		h.broadcastRedisMessageToLocalClients(channelID, []byte(msg.Payload))
 	}
+}
+
+// broadcastRedisMessageToLocalClients handles Redis message distribution using connection cache
+// Implements concurrent message delivery for Redis messages
+func (h *Hub) broadcastRedisMessageToLocalClients(channelID uint, message []byte) {
+	// Get online users in the channel from connection cache
+	onlineUsers := h.ConnectionCache.GetOnlineUsersInChannel(channelID)
+
+	if len(onlineUsers) == 0 {
+		log.Printf("No online users in channel %d for Redis message", channelID)
+		return
+	}
+
+	log.Printf("Distributing Redis message to %d online users in channel %d", len(onlineUsers), channelID)
+
+	// Use goroutines for concurrent message delivery
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	successCount := 0
+	failureCount := 0
+
+	for _, userID := range onlineUsers {
+		wg.Add(1)
+		go func(uid uint) {
+			defer wg.Done()
+
+			// Get the client connection from cache
+			client, exists := h.ConnectionCache.GetConnection(uid)
+			if !exists {
+				log.Printf("Client connection not found for user %d (Redis message)", uid)
+				return
+			}
+
+			// Send Redis message with connection failure handling
+			client.mu.Lock()
+			err := client.Conn.WriteMessage(websocket.TextMessage, message)
+			client.mu.Unlock()
+
+			if err != nil {
+				log.Printf("Redis message write error for user %d: %v", uid, err)
+				// Handle connection failure by unregistering the client (non-blocking)
+				select {
+				case h.Unregister <- client:
+				default:
+					// If unregister channel is full, just log and continue
+					log.Printf("Failed to unregister client %d: channel full", uid)
+				}
+				mu.Lock()
+				failureCount++
+				mu.Unlock()
+			} else {
+				log.Printf("Redis message sent to user %d in channel %d", uid, channelID)
+				mu.Lock()
+				successCount++
+				mu.Unlock()
+				// Update last activity in connection cache
+				h.ConnectionCache.UpdateLastActivity(uid)
+			}
+		}(userID)
+	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
+	log.Printf("Redis message distribution completed: %d successful, %d failed in channel %d",
+		successCount, failureCount, channelID)
 }
 
 // WsAddChannel subscribes a client to a specific channel
 // Thread-safe operation that adds the channel to the client's subscription list
-func (c *Client) WsAddChannel(channelID uint) {
+func (c *Client) WsAddChannel(channelID uint, hub *Hub) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -157,15 +204,27 @@ func (c *Client) WsAddChannel(channelID uint) {
 		c.Channels = make(map[uint]bool)
 	}
 	c.Channels[channelID] = true
+
+	// Update connection cache
+	if hub != nil && hub.ConnectionCache != nil {
+		hub.ConnectionCache.AddUserToChannel(c.ID, channelID)
+	}
+
 	log.Printf("Client %d subscribed to channel %d", c.ID, channelID)
 }
 
 // WsRemoveChannel unsubscribes a client from a specific channel
 // Thread-safe operation that removes the channel from the client's subscription list
-func (c *Client) WsRemoveChannel(channelID uint) {
+func (c *Client) WsRemoveChannel(channelID uint, hub *Hub) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.Channels, channelID)
+
+	// Update connection cache
+	if hub != nil && hub.ConnectionCache != nil {
+		hub.ConnectionCache.RemoveUserFromChannel(c.ID, channelID)
+	}
+
 	log.Printf("Client %d unsubscribed from channel %d", c.ID, channelID)
 }
 
@@ -218,13 +277,13 @@ func (c *Client) WsHandleIncomingMessages(hub *Hub) {
 		case "join":
 			// Subscribe client to the specified channel
 			log.Printf("🟢 Client %d: Attempting to join channel %d", c.ID, msgData.ChannelID)
-			c.WsAddChannel(msgData.ChannelID)
+			c.WsAddChannel(msgData.ChannelID, hub)
 			log.Printf("✅ Client %d: Successfully joined channel %d", c.ID, msgData.ChannelID)
 
 		case "leave":
 			// Unsubscribe client from the specified channel
 			log.Printf("🟡 Client %d: Attempting to leave channel %d", c.ID, msgData.ChannelID)
-			c.WsRemoveChannel(msgData.ChannelID)
+			c.WsRemoveChannel(msgData.ChannelID, hub)
 			log.Printf("✅ Client %d: Successfully left channel %d", c.ID, msgData.ChannelID)
 
 		case "message":
@@ -261,12 +320,83 @@ func (c *Client) WsHandleIncomingMessages(hub *Hub) {
 	log.Printf("🔴 Client %d: Message handler stopped", c.ID)
 }
 
+// broadcastToLocalClients uses connection cache for optimized local message broadcasting
+// Implements concurrent message delivery using goroutines for better performance
+func (h *Hub) broadcastToLocalClients(channelID uint, message []byte) {
+	// Get online users in the channel from connection cache
+	onlineUsers := h.ConnectionCache.GetOnlineUsersInChannel(channelID)
+
+	if len(onlineUsers) == 0 {
+		log.Printf("No online users in channel %d", channelID)
+		return
+	}
+
+	log.Printf("Broadcasting to %d online users in channel %d", len(onlineUsers), channelID)
+
+	// Use goroutines for concurrent message delivery
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	successCount := 0
+	failureCount := 0
+
+	for _, userID := range onlineUsers {
+		wg.Add(1)
+		go func(uid uint) {
+			defer wg.Done()
+
+			// Get the client connection from cache
+			client, exists := h.ConnectionCache.GetConnection(uid)
+			if !exists {
+				log.Printf("Client connection not found for user %d", uid)
+				return
+			}
+
+			// Send message with connection failure handling
+			client.mu.Lock()
+			err := client.Conn.WriteMessage(websocket.TextMessage, message)
+			client.mu.Unlock()
+
+			if err != nil {
+				log.Printf("Write error for user %d: %v", uid, err)
+				// Handle connection failure by unregistering the client (non-blocking)
+				select {
+				case h.Unregister <- client:
+				default:
+					// If unregister channel is full, just log and continue
+					log.Printf("Failed to unregister client %d: channel full", uid)
+				}
+				mu.Lock()
+				failureCount++
+				mu.Unlock()
+			} else {
+				log.Printf("Message sent to user %d in channel %d", uid, channelID)
+				mu.Lock()
+				successCount++
+				mu.Unlock()
+				// Update last activity in connection cache
+				h.ConnectionCache.UpdateLastActivity(uid)
+			}
+		}(userID)
+	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
+	log.Printf("Message broadcast completed: %d successful, %d failed in channel %d",
+		successCount, failureCount, channelID)
+}
+
+// BroadcastMessage optimized method using connection cache for targeted delivery
 func (h *Hub) BroadcastMessage(msg *models.Chat) {
 	msgBytes, err := json.Marshal(msg)
 	if err != nil {
 		log.Printf("Failed to marshal chat message: %v", err)
 		return
 	}
+
+	// Use connection cache for immediate local broadcasting
+	h.broadcastToLocalClients(msg.ChannelID, msgBytes)
+
+	// Also send to Redis for cross-instance distribution
 	h.Broadcast <- ChannelMessage{
 		ChannelID: msg.ChannelID,
 		Data:      msgBytes,
