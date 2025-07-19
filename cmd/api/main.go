@@ -12,7 +12,7 @@ func main() {
 	config := configs.Load()
 
 	// Start the WebSocket hub in a goroutine
-	go config.WSHub.WsRun()
+	go config.WSHub.Run()
 	log.Println("🚀 WebSocket hub started")
 
 	application, err := router.NewApp()

@@ -2,7 +2,7 @@ package configs
 
 import (
 	"chat-service/configs/database"
-	"chat-service/configs/utils/ws"
+	"chat-service/internal/handler/ws"
 	"log"
 	"sync"
 	"time"
@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
 )
+
 // maskPassword masks the password in a database URL for safe logging
 func maskPassword(dsn string) string {
 	if dsn == "" {
@@ -109,7 +110,7 @@ func Load() *Config {
 		log.Printf("✅ Database connection established successfully")
 
 		// Use the centralized WebSocket upgrader with proper origin checking
-		wsHub := ws.WsNewHub(redisClient)
+		wsHub := ws.NewHub(redisClient)
 
 		ConfigInstance = &Config{
 			Port:       appPort,

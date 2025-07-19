@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"chat-service/configs/middleware"
-	"chat-service/configs/utils/ws"
+	"chat-service/internal/handler/ws"
 	"chat-service/internal/models"
 	"chat-service/internal/repository"
 	"chat-service/internal/service"

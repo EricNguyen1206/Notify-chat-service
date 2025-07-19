@@ -3,7 +3,8 @@ package handler
 import (
 	"chat-service/configs"
 	"chat-service/configs/utils"
-	"chat-service/configs/utils/ws"
+	"chat-service/internal/handler/ws"
+	modelws "chat-service/internal/models/ws"
 	"log"
 
 	"github.com/gin-gonic/gin"
@@ -62,16 +63,19 @@ func (h *WSHandler) HandleWebSocket(c *gin.Context) {
 	log.Printf("✅ WebSocket upgrade success for User %d", userID)
 
 	// Create new Client
-	client := &ws.Client{
+	client := &modelws.Client{
 		ID:   userID,
-		Conn: conn,
+		Conn: &ws.WebSocketConnWrapper{Conn: conn},
 	}
 
+	// Create a client wrapper to handle methods
+	clientWrapper := ws.NewClientWrapper(client)
+
 	log.Printf("📝 Registering client %d to hub", userID)
-	// Regist client to hub
+	// Register client to hub
 	h.hub.Register <- client
 
 	log.Printf("🚀 Starting message handler for client %d", userID)
 	// Start handle message
-	go client.WsHandleIncomingMessages(h.hub)
+	go clientWrapper.WsHandleIncomingMessages(h.hub)
 }

@@ -14,7 +14,7 @@ var Upgrader = websocket.Upgrader{
 	// Allow specific origins for WebSocket connections
 	CheckOrigin: func(r *http.Request) bool {
 		origin := r.Header.Get("Origin")
-		
+
 		// Define allowed origins
 		allowedOrigins := []string{
 			"http://localhost:3000",
@@ -22,26 +22,26 @@ var Upgrader = websocket.Upgrader{
 			"https://notify-chat.netlify.app",
 			"http://127.0.0.1:3000",
 		}
-		
+
 		// Add custom origins from environment variable if set
 		if customOrigins := os.Getenv("ALLOWED_ORIGINS"); customOrigins != "" {
 			for _, customOrigin := range strings.Split(customOrigins, ",") {
 				allowedOrigins = append(allowedOrigins, strings.TrimSpace(customOrigin))
 			}
 		}
-		
+
 		// Check if origin is in allowed list
 		for _, allowedOrigin := range allowedOrigins {
 			if origin == allowedOrigin {
 				return true
 			}
 		}
-		
+
 		// For development/testing, allow any localhost variations
 		if origin != "" && (strings.Contains(origin, "localhost") || strings.Contains(origin, "127.0.0.1")) {
 			return true
 		}
-		
+
 		return false
 	},
 }
