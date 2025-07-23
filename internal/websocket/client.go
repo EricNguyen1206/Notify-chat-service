@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"pkg/logger"
+	"log/slog"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -60,10 +60,9 @@ type Client struct {
 	userID   string
 	channels map[string]bool // Set of channel IDs the client is subscribed to
 	mu       sync.RWMutex
-	logger   *logger.Logger
 }
 
-func NewClient(hub *Hub, conn *websocket.Conn, userID string, logger *logger.Logger) *Client {
+func NewClient(hub *Hub, conn *websocket.Conn, userID string) *Client {
 	return &Client{
 		id:       uuid.New().String(),
 		hub:      hub,
@@ -71,7 +70,6 @@ func NewClient(hub *Hub, conn *websocket.Conn, userID string, logger *logger.Log
 		send:     make(chan []byte, 256),
 		userID:   userID,
 		channels: make(map[string]bool),
-		logger:   logger,
 	}
 }
 
@@ -129,14 +127,14 @@ func (c *Client) readPump() {
 		_, messageBytes, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				c.logger.Error("WebSocket error", "error", err)
+				slog.Error("WebSocket error", "error", err)
 			}
 			break
 		}
 
 		var msg Message
 		if err := json.Unmarshal(messageBytes, &msg); err != nil {
-			c.logger.Error("Failed to unmarshal message", "error", err)
+			slog.Error("Failed to unmarshal message", "error", err)
 			c.sendError("INVALID_MESSAGE", "Invalid message format")
 			continue
 		}
@@ -226,14 +224,14 @@ func (c *Client) sendError(code, message string) {
 	c.SendMessage(errorMsg)
 }
 
-func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request, userID string, logger *logger.Logger) {
+func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request, userID string) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		logger.Error("Failed to upgrade WebSocket connection", "error", err)
+		slog.Error("Failed to upgrade WebSocket connection", "error", err)
 		return
 	}
 
-	client := NewClient(hub, conn, userID, logger)
+	client := NewClient(hub, conn, userID)
 	client.hub.register <- client
 
 	// Allow collection of memory referenced by the caller by doing all work in new goroutines

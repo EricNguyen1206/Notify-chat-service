@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"chat-service/internal/config"
-	"chat-service/internal/utils"
 	"chat-service/internal/websocket"
 	"log"
 
@@ -37,41 +35,15 @@ func (h *WSHandler) RegisterRoutes(r *gin.RouterGroup) {
 // @Router /ws [get]
 func (h *WSHandler) HandleWebSocket(c *gin.Context) {
 	// Get userId from query parameters: /api/ws?userId=1
-	userIDStr := c.Query("userId")
-	if userIDStr == "" {
+	userID := c.Query("userId")
+	if userID == "" {
 		log.Printf("🔴 WebSocket connection failed: missing userId parameter")
 		c.JSON(400, gin.H{"error": "userId parameter is required"})
 		return
 	}
 
-	userID, err := utils.StringToUint(userIDStr)
-	if err != nil {
-		log.Printf("🔴 WebSocket connection failed: invalid userId '%s': %v", userIDStr, err)
-		c.JSON(400, gin.H{"error": "invalid userId parameter"})
-		return
-	}
+	log.Printf("🟢 New WebSocket connection request from User ID: %s", userID)
 
-	log.Printf("🟢 New WebSocket connection request from User ID: %d", userID)
-
-	// Upgrade the connection to websocket protocol
-	conn, err := config.ConfigInstance.WSUpgrader.Upgrade(c.Writer, c.Request, nil)
-	if err != nil {
-		log.Printf("🔴 WebSocket upgrade failed for User %d: %v", userID, err)
-		return
-	}
-	log.Printf("✅ WebSocket upgrade success for User %d", userID)
-
-	// Create new Client
-	client := &websocket.Client{
-		ID:   userID,
-		Conn: conn,
-	}
-
-	log.Printf("📝 Registering client %d to hub", userID)
-	// Regist client to hub
-	h.hub.Register <- client
-
-	log.Printf("🚀 Starting message handler for client %d", userID)
-	// Start handle message
-	go client.WsHandleIncomingMessages(h.hub)
+	// Use the ServeWS function from websocket package for proper client creation and registration
+	websocket.ServeWS(h.hub, c.Writer, c.Request, userID)
 }

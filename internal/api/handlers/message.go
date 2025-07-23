@@ -123,7 +123,23 @@ func (h *ChatHandler) CreateChatMessage(c *gin.Context) {
 	}
 
 	// Send message to WebSocket clients
-	h.hub.BroadcastMessage(chat)
+	msg := &websocket.Message{
+		ID:   "", // Let the frontend or hub assign if needed
+		Type: websocket.MessageTypeChannelMessage,
+		Data: map[string]interface{}{
+			"channel_id": chat.ChannelID,
+			"content":    chat.Text,
+			"sender_id":  chat.SenderID,
+			"file_name":  chat.FileName,
+			"url":        chat.URL,
+		},
+		Timestamp: chat.CreatedAt.Unix(),
+		UserID:    strconv.FormatUint(uint64(chat.SenderID), 10),
+	}
+	if err := h.hub.RedisService().PublishChannelMessage(h.hub.Context(), strconv.FormatUint(uint64(chat.ChannelID), 10), msg); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to publish chat message to channel"})
+		return
+	}
 
 	// Optionally preload sender for response
 	response := models.ChatResponse{

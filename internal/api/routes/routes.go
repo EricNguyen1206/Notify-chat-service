@@ -44,7 +44,7 @@ type App struct {
 }
 
 func NewApp() (*App, error) {
-	config := config.Load()
+	config, _ := config.LoadConfig()
 
 	// Repository
 	userRepo := postgres.NewUserRepository(config.DB)

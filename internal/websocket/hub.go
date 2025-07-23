@@ -3,10 +3,10 @@ package websocket
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 
 	"chat-service/internal/services"
-	"pkg/logger"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -52,11 +52,9 @@ type Hub struct {
 
 	// Mutex for thread safety
 	mu sync.RWMutex
-
-	logger *logger.Logger
 }
 
-func NewHub(redisService *services.RedisService, logger *logger.Logger) *Hub {
+func NewHub(redisService *services.RedisService) *Hub {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	hub := &Hub{
@@ -69,7 +67,6 @@ func NewHub(redisService *services.RedisService, logger *logger.Logger) *Hub {
 		redisService:   redisService,
 		ctx:            ctx,
 		cancel:         cancel,
-		logger:         logger,
 	}
 
 	return hub
@@ -91,7 +88,7 @@ func (h *Hub) Run() {
 			h.handleClientMessage(clientMsg)
 
 		case <-h.ctx.Done():
-			h.logger.Info("WebSocket hub shutting down")
+			slog.Info("WebSocket hub shutting down")
 			return
 		}
 	}
@@ -116,10 +113,126 @@ func (h *Hub) registerClient(client *Client) {
 	}
 	h.userClients[client.userID][client] = true
 
-	h.logger.Info("Client registered", "clientID", client.id, "userID", client.userID)
+	slog.Info("Client registered", "clientID", client.id, "userID", client.userID)
 
 	// Set user online in Redis
 	if err := h.redisService.SetUserOnline(h.ctx, client.userID); err != nil {
-		h.logger.Error("Failed to set user online", "userID", client.userID, "error", err)
+		slog.Error("Failed to set user online", "userID", client.userID, "error", err)
 	}
+}
+
+func (h *Hub) subscribeToRedis() {
+	// Subscribe to all channel message patterns (wildcard)
+	h.pubsub = h.redisService.PSubscribe(h.ctx, "chat:channel:*")
+	go func() {
+		for {
+			msg, err := h.pubsub.ReceiveMessage(h.ctx)
+			if err != nil {
+				if h.ctx.Err() != nil {
+					return // context cancelled, exit goroutine
+				}
+				slog.Error("Redis pubsub receive error", "error", err)
+				continue
+			}
+			// Extract channel ID from topic (e.g., chat:channel:<id>)
+			var channelID string
+			_, err = fmt.Sscanf(msg.Channel, "chat:channel:%s", &channelID)
+			if err != nil {
+				slog.Error("Failed to parse channel ID from topic", "topic", msg.Channel, "error", err)
+				continue
+			}
+			// Broadcast to all clients in this channel
+			h.mu.RLock()
+			clients := h.channelClients[channelID]
+			h.mu.RUnlock()
+			for client := range clients {
+				client.SendMessage(&Message{
+					Type:      MessageTypeChannelMessage,
+					Data:      map[string]interface{}{"raw": msg.Payload},
+					Timestamp: 0, // Could parse from payload if needed
+				})
+			}
+		}
+	}()
+}
+
+func (h *Hub) unregisterClient(client *Client) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	delete(h.clients, client)
+	// Remove from userClients
+	if userMap, ok := h.userClients[client.userID]; ok {
+		delete(userMap, client)
+		if len(userMap) == 0 {
+			delete(h.userClients, client.userID)
+			// Set user offline in Redis
+			if err := h.redisService.SetUserOffline(h.ctx, client.userID); err != nil {
+				slog.Error("Failed to set user offline", "userID", client.userID, "error", err)
+			}
+		}
+	}
+	// Remove from all channelClients
+	for channelID := range client.channels {
+		if chMap, ok := h.channelClients[channelID]; ok {
+			delete(chMap, client)
+			if len(chMap) == 0 {
+				delete(h.channelClients, channelID)
+			}
+		}
+	}
+	slog.Info("Client unregistered", "clientID", client.id, "userID", client.userID)
+}
+
+func (h *Hub) handleClientMessage(clientMsg *ClientMessage) {
+	client := clientMsg.Client
+	msg := clientMsg.Message
+	switch msg.Type {
+	case MessageTypeJoinChannel:
+		// Join channel
+		if data, ok := msg.Data["channel_id"].(string); ok {
+			h.mu.Lock()
+			if h.channelClients[data] == nil {
+				h.channelClients[data] = make(map[*Client]bool)
+			}
+			h.channelClients[data][client] = true
+			h.mu.Unlock()
+			client.AddChannel(data)
+			// Optionally: update Redis membership
+			if err := h.redisService.JoinChannel(h.ctx, client.userID, data); err != nil {
+				slog.Error("Failed to join channel in Redis", "userID", client.userID, "channelID", data, "error", err)
+			}
+		}
+	case MessageTypeLeaveChannel:
+		if data, ok := msg.Data["channel_id"].(string); ok {
+			h.mu.Lock()
+			if chMap, ok := h.channelClients[data]; ok {
+				delete(chMap, client)
+				if len(chMap) == 0 {
+					delete(h.channelClients, data)
+				}
+			}
+			h.mu.Unlock()
+			client.RemoveChannel(data)
+			if err := h.redisService.LeaveChannel(h.ctx, client.userID, data); err != nil {
+				slog.Error("Failed to leave channel in Redis", "userID", client.userID, "channelID", data, "error", err)
+			}
+		}
+	case MessageTypeChannelMessage:
+		if data, ok := msg.Data["channel_id"].(string); ok {
+			// Publish to Redis so all subscribers get it
+			if err := h.redisService.PublishChannelMessage(h.ctx, data, msg); err != nil {
+				slog.Error("Failed to publish channel message", "channelID", data, "error", err)
+			}
+		}
+	default:
+		slog.Warn("Unknown message type", "type", msg.Type)
+	}
+}
+
+func (h *Hub) RedisService() *services.RedisService {
+	return h.redisService
+}
+
+func (h *Hub) Context() context.Context {
+	return h.ctx
 }

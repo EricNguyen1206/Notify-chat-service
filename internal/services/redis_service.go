@@ -6,21 +6,19 @@ import (
 	"fmt"
 	"time"
 
-	"internal/database"
-	"pkg/logger"
+	"chat-service/internal/database"
+	"log/slog"
 
 	"github.com/redis/go-redis/v9"
 )
 
 type RedisService struct {
 	client *database.RedisClient
-	logger *logger.Logger
 }
 
-func NewRedisService(client *database.RedisClient, logger *logger.Logger) *RedisService {
+func NewRedisService(client *database.RedisClient) *RedisService {
 	return &RedisService{
 		client: client,
-		logger: logger,
 	}
 }
 
@@ -46,11 +44,11 @@ func (r *RedisService) SetUserOnline(ctx context.Context, userID string) error {
 
 	_, err := pipe.Exec(ctx)
 	if err != nil {
-		r.logger.Error("Failed to set user online", "userID", userID, "error", err)
+		slog.Error("Failed to set user online", "userID", userID, "error", err)
 		return err
 	}
 
-	r.logger.Debug("User set to online", "userID", userID)
+	slog.Debug("User set to online", "userID", userID)
 	return nil
 }
 
@@ -72,11 +70,11 @@ func (r *RedisService) SetUserOffline(ctx context.Context, userID string) error 
 
 	_, err := pipe.Exec(ctx)
 	if err != nil {
-		r.logger.Error("Failed to set user offline", "userID", userID, "error", err)
+		slog.Error("Failed to set user offline", "userID", userID, "error", err)
 		return err
 	}
 
-	r.logger.Debug("User set to offline", "userID", userID)
+	slog.Debug("User set to offline", "userID", userID)
 	return nil
 }
 
@@ -110,7 +108,7 @@ func (r *RedisService) JoinChannel(ctx context.Context, userID, channelID string
 
 	_, err := pipe.Exec(ctx)
 	if err != nil {
-		r.logger.Error("Failed to join channel", "userID", userID, "channelID", channelID, "error", err)
+		slog.Error("Failed to join channel", "userID", userID, "channelID", channelID, "error", err)
 		return err
 	}
 
@@ -136,7 +134,7 @@ func (r *RedisService) LeaveChannel(ctx context.Context, userID, channelID strin
 
 	_, err := pipe.Exec(ctx)
 	if err != nil {
-		r.logger.Error("Failed to leave channel", "userID", userID, "channelID", channelID, "error", err)
+		slog.Error("Failed to leave channel", "userID", userID, "channelID", channelID, "error", err)
 		return err
 	}
 
@@ -171,11 +169,11 @@ func (r *RedisService) PublishChannelMessage(ctx context.Context, channelID stri
 
 	err = r.client.GetClient().Publish(ctx, fmt.Sprintf("chat:channel:%s", channelID), data).Err()
 	if err != nil {
-		r.logger.Error("Failed to publish channel message", "channelID", channelID, "error", err)
+		slog.Error("Failed to publish channel message", "channelID", channelID, "error", err)
 		return err
 	}
 
-	r.logger.Debug("Published channel message", "channelID", channelID)
+	slog.Debug("Published channel message", "channelID", channelID)
 	return nil
 }
 
@@ -187,11 +185,11 @@ func (r *RedisService) PublishChannelEvent(ctx context.Context, channelID string
 
 	err = r.client.GetClient().Publish(ctx, fmt.Sprintf("channel:%s:events", channelID), data).Err()
 	if err != nil {
-		r.logger.Error("Failed to publish channel event", "channelID", channelID, "error", err)
+		slog.Error("Failed to publish channel event", "channelID", channelID, "error", err)
 		return err
 	}
 
-	r.logger.Debug("Published channel event", "channelID", channelID)
+	slog.Debug("Published channel event", "channelID", channelID)
 	return nil
 }
 
@@ -203,23 +201,23 @@ func (r *RedisService) PublishUserNotification(ctx context.Context, userID strin
 
 	err = r.client.GetClient().Publish(ctx, fmt.Sprintf("user:%s:notifications", userID), data).Err()
 	if err != nil {
-		r.logger.Error("Failed to publish user notification", "userID", userID, "error", err)
+		slog.Error("Failed to publish user notification", "userID", userID, "error", err)
 		return err
 	}
 
-	r.logger.Debug("Published user notification", "userID", userID)
+	slog.Debug("Published user notification", "userID", userID)
 	return nil
 }
 
 func (r *RedisService) Subscribe(ctx context.Context, channels ...string) *redis.PubSub {
 	pubsub := r.client.GetClient().Subscribe(ctx, channels...)
-	r.logger.Debug("Subscribed to channels", "channels", channels)
+	slog.Debug("Subscribed to channels", "channels", channels)
 	return pubsub
 }
 
 func (r *RedisService) PSubscribe(ctx context.Context, patterns ...string) *redis.PubSub {
 	pubsub := r.client.GetClient().PSubscribe(ctx, patterns...)
-	r.logger.Debug("Pattern subscribed to channels", "patterns", patterns)
+	slog.Debug("Pattern subscribed to channels", "patterns", patterns)
 	return pubsub
 }
 

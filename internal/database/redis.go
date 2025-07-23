@@ -6,28 +6,18 @@ import (
 	"time"
 
 	"chat-service/internal/config"
-	"pkg/logger"
+	"log/slog"
 
 	"github.com/redis/go-redis/v9"
 )
 
 type RedisClient struct {
 	client *redis.Client
-	logger *logger.Logger
 }
 
-func NewRedisConnection(cfg *config.RedisConfig, log *logger.Logger) (*RedisClient, error) {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:         fmt.Sprintf("%s:%s", cfg.Host, cfg.Port),
-		Password:     cfg.Password,
-		DB:           cfg.DB,
-		MaxRetries:   cfg.MaxRetries,
-		DialTimeout:  cfg.DialTimeout,
-		ReadTimeout:  cfg.ReadTimeout,
-		WriteTimeout: cfg.WriteTimeout,
-		PoolSize:     cfg.PoolSize,
-		MinIdleConns: cfg.MinIdleConns,
-	})
+func NewRedisConnection(cfg *config.RedisConfig) (*RedisClient, error) {
+	opt, _ := redis.ParseURL(cfg.URI)
+	rdb := redis.NewClient(opt)
 
 	// Test connection
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -37,11 +27,10 @@ func NewRedisConnection(cfg *config.RedisConfig, log *logger.Logger) (*RedisClie
 		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
 	}
 
-	log.Info("Redis connection established successfully")
+	slog.Info("Redis connection established successfully")
 
 	return &RedisClient{
 		client: rdb,
-		logger: log,
 	}, nil
 }
 
