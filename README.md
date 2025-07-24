@@ -11,6 +11,7 @@ A high-performance real-time chat service built with Go, featuring WebSocket sup
 
 - [Notify Chat Service](#notify-chat-service)
   - [📋 Table of Contents](#-table-of-contents)
+  - [🗂️ Project Structure](#️-project-structure)
   - [🚀 About The Project](#-about-the-project)
     - [Built With](#built-with)
       - [Backend Framework](#backend-framework)
@@ -49,6 +50,135 @@ A high-performance real-time chat service built with Go, featuring WebSocket sup
   - [📄 License](#-license)
   - [📞 Contact](#-contact)
   - [🙏 Acknowledgments](#-acknowledgments)
+
+## 🗂️ Project Structure
+
+```
+Notify-chat-service/
+├── cmd/
+│   └── server/
+│       └── main.go                 # Application entry point
+│
+├── internal/                       # Private application code
+│   ├── api/                       # HTTP handlers (Controllers)
+│   │   ├── middleware/
+│   │   │   ├── auth.go            # JWT authentication middleware
+│   │   │   ├── cors.go            # CORS middleware
+│   │   │   ├── rate_limit.go      # Rate limiting middleware
+│   │   │   └── logging.go         # Request logging middleware
+│   │   ├── handlers/
+│   │   │   ├── auth.go            # Login, register, logout
+│   │   │   ├── user.go            # User management endpoints
+│   │   │   ├── channel.go         # Channel management
+│   │   │   ├── message.go         # Message history endpoints
+│   │   │   └── websocket.go       # WebSocket connection handler
+│   │   └── routes/
+│   │       └── routes.go          # Route definitions and setup
+│   │
+│   ├── services/                  # Business logic layer
+│   │   ├── auth_service.go        # Authentication logic
+│   │   ├── user_service.go        # User business logic
+│   │   ├── channel_service.go     # Channel management logic
+│   │   ├── message_service.go     # Message processing logic
+│   │   ├── websocket_service.go   # WebSocket connection management
+│   │   └── redis_service.go       # Redis operations wrapper
+│   │
+│   ├── repositories/              # Data access layer
+│   │   ├── interfaces/
+│   │   │   ├── user_repository.go        # User repository interface
+│   │   │   ├── channel_repository.go     # Channel repository interface
+│   │   │   ├── message_repository.go     # Message repository interface
+│   │   │   └── cache_repository.go       # Cache repository interface
+│   │   ├── postgres/
+│   │   │   ├── user_repository.go        # PostgreSQL user operations
+│   │   │   ├── channel_repository.go     # PostgreSQL channel operations
+│   │   │   └── message_repository.go     # PostgreSQL message operations
+│   │   └── redis/
+│   │       └── cache_repository.go    # Redis cache operations
+│   │
+│   ├── models/                    # Data models
+│   │   ├── user.go               # User model and GORM tags
+│   │   ├── channel.go            # Chat channel model
+│   │   ├── message.go            # Message model
+│   │   ├── channel_member.go     # Channel membership model
+│   │   └── dto/                  # Data Transfer Objects
+│   │       ├── auth_dto.go       # Login/Register DTOs
+│   │       ├── user_dto.go       # User response DTOs
+│   │       ├── channel_dto.go    # Channel DTOs
+│   │       └── message_dto.go    # Message DTOs
+│   │
+│   ├── websocket/                # WebSocket management
+│   │   ├── hub.go                # WebSocket hub (channel connection manager)
+│   │   ├── client.go             # WebSocket client representation
+│   │   ├── channel.go            # Channel-specific WebSocket logic
+│   │   ├── message_types.go      # WebSocket message types
+│   │   └── handlers.go           # WebSocket message handlers
+│   │
+│   ├── database/                 # Database configuration
+│   │   ├── postgres.go           # PostgreSQL connection setup
+│   │   ├── redis.go              # Redis connection setup
+│   │   └── migrations/           # Database migrations
+│   │       ├── 001_create_users.sql
+│   │       ├── 002_create_channels.sql
+│   │       ├── 003_create_messages.sql
+│   │       └── 004_create_channel_members.sql
+│   │
+│   ├── utils/                    # Utility functions
+│   │   ├── jwt.go                # JWT token utilities
+│   │   ├── password.go           # Password hashing utilities
+│   │   ├── validator.go          # Input validation utilities
+│   │   ├── response.go           # Standardized API responses
+│   │   └── rate_limiter.go       # Rate limiting utilities
+│   │
+│   └── config/                   # Configuration management
+│       ├── config.go             # Configuration struct and loading
+│       └── env.go                # Environment variable handling
+│
+├── pkg/                          # Public/shared packages
+│   ├── logger/
+│   │   └── logger.go             # Structured logging setup
+│   ├── errors/
+│   │   └── errors.go             # Custom error types
+│   └── constants/
+│       └── constants.go          # Application constants
+│
+├── tests/                        # Test files
+│   ├── integration/
+│   │   ├── auth_test.go
+│   │   ├── websocket_test.go
+│   │   └── api_test.go
+│   ├── unit/
+│   │   ├── services/
+│   │   ├── repositories/
+│   │   └── handlers/
+│   └── fixtures/
+│       └── test_data.go          # Test data setup
+│
+├── deployments/                  # Deployment configurations
+│   ├── docker/
+│   │   ├── Dockerfile
+│   │   └── docker-compose.yml
+│   └── k8s/                      # Kubernetes manifests (if needed)
+│       ├── deployment.yaml
+│       └── service.yaml
+│
+├── scripts/                      # Build and deployment scripts
+│   ├── build.sh
+│   ├── migrate.sh
+│   └── seed.sh                   # Database seeding script
+│
+├── docs/                         # Documentation
+│   ├── api.md                    # API documentation
+│   ├── websocket.md              # WebSocket protocol documentation
+│   └── deployment.md             # Deployment guide
+│
+├── .env.example                  # Environment variables template
+├── .gitignore
+├── go.mod                        # Go modules file
+├── go.sum                        # Go modules checksum
+├── Makefile                      # Build automation
+└── README.md
+```
 
 ## 🚀 About The Project
 
