@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"chat-service/internal/api/middleware"
 	"chat-service/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -16,24 +15,6 @@ type ChannelHandler struct {
 
 func NewChannelHandler(channelService *services.ChannelService) *ChannelHandler {
 	return &ChannelHandler{channelService: channelService}
-}
-
-// RegisterRoutes maps HTTP methods to handler functions
-func (h *ChannelHandler) RegisterRoutes(r *gin.RouterGroup) {
-	channels := r.Group("/channels")
-	{
-		channels.Use(middleware.Auth())
-		channels.GET("/", h.GetUserChannels)
-		channels.POST("/", h.CreateChannel)
-		// Individual channel routes with :id parameter
-		channels.GET("/:id", h.GetChannelByID)
-		channels.PUT("/:id", h.UpdateChannel)
-		channels.DELETE("/:id", h.DeleteChannel)
-		// user-channel relation logic
-		channels.POST("/:id/user", h.AddUserToChannel)
-		channels.PUT("/:id/user", h.LeaveChannel)
-		channels.DELETE("/:id/user", h.RemoveUserFromChannel)
-	}
 }
 
 // GetUserChannels godoc

@@ -2,9 +2,11 @@ package websocket
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"chat-service/internal/services"
 
@@ -119,120 +121,383 @@ func (h *Hub) registerClient(client *Client) {
 	if err := h.redisService.SetUserOnline(h.ctx, client.userID); err != nil {
 		slog.Error("Failed to set user online", "userID", client.userID, "error", err)
 	}
-}
 
-func (h *Hub) subscribeToRedis() {
-	// Subscribe to all channel message patterns (wildcard)
-	h.pubsub = h.redisService.PSubscribe(h.ctx, "chat:channel:*")
-	go func() {
-		for {
-			msg, err := h.pubsub.ReceiveMessage(h.ctx)
-			if err != nil {
-				if h.ctx.Err() != nil {
-					return // context cancelled, exit goroutine
-				}
-				slog.Error("Redis pubsub receive error", "error", err)
-				continue
-			}
-			// Extract channel ID from topic (e.g., chat:channel:<id>)
-			var channelID string
-			_, err = fmt.Sscanf(msg.Channel, "chat:channel:%s", &channelID)
-			if err != nil {
-				slog.Error("Failed to parse channel ID from topic", "topic", msg.Channel, "error", err)
-				continue
-			}
-			// Broadcast to all clients in this channel
-			h.mu.RLock()
-			clients := h.channelClients[channelID]
-			h.mu.RUnlock()
-			for client := range clients {
-				client.SendMessage(&Message{
-					Type:      MessageTypeChannelMessage,
-					Data:      map[string]interface{}{"raw": msg.Payload},
-					Timestamp: 0, // Could parse from payload if needed
-				})
-			}
-		}
-	}()
+	// Send connection success message
+	client.SendMessage(&Message{
+		ID:        fmt.Sprintf("conn_%d", time.Now().UnixNano()),
+		Type:      MessageTypeConnect,
+		Timestamp: time.Now().Unix(),
+		Data: map[string]interface{}{
+			"client_id": client.id,
+			"status":    "connected",
+		},
+	})
 }
 
 func (h *Hub) unregisterClient(client *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	delete(h.clients, client)
-	// Remove from userClients
-	if userMap, ok := h.userClients[client.userID]; ok {
-		delete(userMap, client)
-		if len(userMap) == 0 {
-			delete(h.userClients, client.userID)
-			// Set user offline in Redis
-			if err := h.redisService.SetUserOffline(h.ctx, client.userID); err != nil {
-				slog.Error("Failed to set user offline", "userID", client.userID, "error", err)
+
+	if _, ok := h.clients[client]; ok {
+		// Remove from clients map
+		delete(h.clients, client)
+
+		// Remove from user clients map
+		if userClients, exists := h.userClients[client.userID]; exists {
+			delete(userClients, client)
+			if len(userClients) == 0 {
+				delete(h.userClients, client.userID)
+				// Set user offline if no more clients
+				if err := h.redisService.SetUserOffline(h.ctx, client.userID); err != nil {
+					slog.Error("Failed to set user offline", "userID", client.userID, "error", err)
+				}
 			}
 		}
-	}
-	// Remove from all channelClients
-	for channelID := range client.channels {
-		if chMap, ok := h.channelClients[channelID]; ok {
-			delete(chMap, client)
-			if len(chMap) == 0 {
-				delete(h.channelClients, channelID)
-			}
+
+		// Remove from all channel subscriptions
+		for channelID := range client.channels {
+			h.removeClientFromChannel(client, channelID)
 		}
+
+		close(client.send)
+		slog.Info("Client unregistered", "clientID", client.id, "userID", client.userID)
 	}
-	slog.Info("Client unregistered", "clientID", client.id, "userID", client.userID)
 }
 
 func (h *Hub) handleClientMessage(clientMsg *ClientMessage) {
 	client := clientMsg.Client
-	msg := clientMsg.Message
-	switch msg.Type {
+	message := clientMsg.Message
+
+	slog.Debug("Handling client message", "type", message.Type, "userID", client.userID)
+
+	switch message.Type {
 	case MessageTypeJoinChannel:
-		// Join channel
-		if data, ok := msg.Data["channel_id"].(string); ok {
-			h.mu.Lock()
-			if h.channelClients[data] == nil {
-				h.channelClients[data] = make(map[*Client]bool)
-			}
-			h.channelClients[data][client] = true
-			h.mu.Unlock()
-			client.AddChannel(data)
-			// Optionally: update Redis membership
-			if err := h.redisService.JoinChannel(h.ctx, client.userID, data); err != nil {
-				slog.Error("Failed to join channel in Redis", "userID", client.userID, "channelID", data, "error", err)
-			}
-		}
+		h.handleJoinChannel(client, message)
 	case MessageTypeLeaveChannel:
-		if data, ok := msg.Data["channel_id"].(string); ok {
-			h.mu.Lock()
-			if chMap, ok := h.channelClients[data]; ok {
-				delete(chMap, client)
-				if len(chMap) == 0 {
-					delete(h.channelClients, data)
-				}
-			}
-			h.mu.Unlock()
-			client.RemoveChannel(data)
-			if err := h.redisService.LeaveChannel(h.ctx, client.userID, data); err != nil {
-				slog.Error("Failed to leave channel in Redis", "userID", client.userID, "channelID", data, "error", err)
-			}
-		}
+		h.handleLeaveChannel(client, message)
 	case MessageTypeChannelMessage:
-		if data, ok := msg.Data["channel_id"].(string); ok {
-			// Publish to Redis so all subscribers get it
-			if err := h.redisService.PublishChannelMessage(h.ctx, data, msg); err != nil {
-				slog.Error("Failed to publish channel message", "channelID", data, "error", err)
-			}
-		}
+		h.handleChannelMessage(client, message)
+	case MessageTypeTyping:
+		h.handleTyping(client, message)
+	case MessageTypePing:
+		h.handlePing(client, message)
 	default:
-		slog.Warn("Unknown message type", "type", msg.Type)
+		slog.Warn("Unknown message type", "type", message.Type)
+		client.sendError("UNKNOWN_MESSAGE_TYPE", "Unknown message type")
 	}
 }
 
-func (h *Hub) RedisService() *services.RedisService {
-	return h.redisService
+func (h *Hub) handleJoinChannel(client *Client, message *Message) {
+	var data JoinChannelData
+	if err := h.mapToStruct(message.Data, &data); err != nil {
+		client.sendError("INVALID_DATA", "Invalid join channel data")
+		return
+	}
+
+	// Check if user can join channel (implement permission checks here)
+	canJoin, err := h.canUserJoinChannel(client.userID, data.ChannelID)
+	if err != nil {
+		slog.Error("Failed to check channel permissions", "error", err)
+		client.sendError("PERMISSION_ERROR", "Failed to check permissions")
+		return
+	}
+
+	if !canJoin {
+		client.sendError("PERMISSION_DENIED", "Permission denied to join channel")
+		return
+	}
+
+	// Add client to channel
+	h.addClientToChannel(client, data.ChannelID)
+
+	// Update Redis
+	if err := h.redisService.JoinChannel(h.ctx, client.userID, data.ChannelID); err != nil {
+		slog.Error("Failed to join channel in Redis", "error", err)
+		client.sendError("JOIN_FAILED", "Failed to join channel")
+		return
+	}
+
+	// Send success response
+	client.SendMessage(&Message{
+		ID:        fmt.Sprintf("join_%d", time.Now().UnixNano()),
+		Type:      MessageTypeJoinChannel,
+		Timestamp: time.Now().Unix(),
+		Data: map[string]interface{}{
+			"channel_id": data.ChannelID,
+			"status":     "joined",
+		},
+	})
 }
 
-func (h *Hub) Context() context.Context {
-	return h.ctx
+func (h *Hub) handleLeaveChannel(client *Client, message *Message) {
+	var data LeaveChannelData
+	if err := h.mapToStruct(message.Data, &data); err != nil {
+		client.sendError("INVALID_DATA", "Invalid leave channel data")
+		return
+	}
+
+	// Remove client from channel
+	h.removeClientFromChannel(client, data.ChannelID)
+
+	// Update Redis
+	if err := h.redisService.LeaveChannel(h.ctx, client.userID, data.ChannelID); err != nil {
+		slog.Error("Failed to leave channel in Redis", "error", err)
+	}
+
+	// Send success response
+	client.SendMessage(&Message{
+		ID:        fmt.Sprintf("leave_%d", time.Now().UnixNano()),
+		Type:      MessageTypeLeaveChannel,
+		Timestamp: time.Now().Unix(),
+		Data: map[string]interface{}{
+			"channel_id": data.ChannelID,
+			"status":     "left",
+		},
+	})
+}
+
+func (h *Hub) handleChannelMessage(client *Client, message *Message) {
+	var data ChannelMessageData
+	if err := h.mapToStruct(message.Data, &data); err != nil {
+		client.sendError("INVALID_DATA", "Invalid message data")
+		return
+	}
+
+	// Check if client is in channel
+	if !client.IsInChannel(data.ChannelID) {
+		client.sendError("NOT_IN_CHANNEL", "You are not in this channel")
+		return
+	}
+
+	// Check rate limit
+	rateLimitKey := fmt.Sprintf("rate_limit:message:%s:%s", client.userID, data.ChannelID)
+	allowed, err := h.redisService.CheckRateLimit(h.ctx, rateLimitKey, 10, time.Minute)
+	if err != nil {
+		slog.Error("Failed to check rate limit", "error", err)
+		client.sendError("RATE_LIMIT_ERROR", "Failed to check rate limit")
+		return
+	}
+
+	if !allowed {
+		client.sendError("RATE_LIMITED", "Rate limit exceeded")
+		return
+	}
+
+	// Create message for broadcast
+	broadcastMessage := &Message{
+		ID:        message.ID,
+		Type:      MessageTypeChannelMessage,
+		UserID:    client.userID,
+		Timestamp: time.Now().Unix(),
+		Data: map[string]interface{}{
+			"channel_id": data.ChannelID,
+			"content":    data.Content,
+			"reply_to":   data.ReplyToID,
+		},
+	}
+
+	// Publish to Redis for other server instances
+	if err := h.redisService.PublishChannelMessage(h.ctx, data.ChannelID, broadcastMessage); err != nil {
+		slog.Error("Failed to publish message to Redis", "error", err)
+		client.sendError("PUBLISH_FAILED", "Failed to send message")
+		return
+	}
+
+	// Broadcast to local clients
+	h.broadcastToChannel(data.ChannelID, broadcastMessage)
+}
+
+func (h *Hub) handleTyping(client *Client, message *Message) {
+	var data TypingData
+	if err := h.mapToStruct(message.Data, &data); err != nil {
+		client.sendError("INVALID_DATA", "Invalid typing data")
+		return
+	}
+
+	// Check if client is in channel
+	if !client.IsInChannel(data.ChannelID) {
+		return
+	}
+
+	// Create typing message
+	typingMessage := &Message{
+		ID:        fmt.Sprintf("typing_%d", time.Now().UnixNano()),
+		Type:      MessageTypeTyping,
+		UserID:    client.userID,
+		Timestamp: time.Now().Unix(),
+		Data: map[string]interface{}{
+			"channel_id": data.ChannelID,
+			"is_typing":  data.IsTyping,
+		},
+	}
+
+	// Broadcast to channel (excluding sender)
+	h.broadcastToChannelExcept(data.ChannelID, typingMessage, client)
+}
+
+func (h *Hub) handlePing(client *Client, message *Message) {
+	pongMessage := &Message{
+		ID:        fmt.Sprintf("pong_%d", time.Now().UnixNano()),
+		Type:      MessageTypePong,
+		Timestamp: time.Now().Unix(),
+		Data: map[string]interface{}{
+			"ping_id": message.ID,
+		},
+	}
+	client.SendMessage(pongMessage)
+}
+
+func (h *Hub) addClientToChannel(client *Client, channelID string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if h.channelClients[channelID] == nil {
+		h.channelClients[channelID] = make(map[*Client]bool)
+	}
+
+	h.channelClients[channelID][client] = true
+	client.AddChannel(channelID)
+
+	slog.Debug("Client added to channel", "clientID", client.id, "channelID", channelID)
+}
+
+func (h *Hub) removeClientFromChannel(client *Client, channelID string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if channelClients, exists := h.channelClients[channelID]; exists {
+		delete(channelClients, client)
+		if len(channelClients) == 0 {
+			delete(h.channelClients, channelID)
+		}
+	}
+
+	client.RemoveChannel(channelID)
+
+	slog.Debug("Client removed from channel", "clientID", client.id, "channelID", channelID)
+}
+
+func (h *Hub) broadcastToChannel(channelID string, message *Message) {
+	h.mu.RLock()
+	clients := h.channelClients[channelID]
+	h.mu.RUnlock()
+
+	for client := range clients {
+		select {
+		case client.send <- h.messageToBytes(message):
+		default:
+			h.unregisterClient(client)
+		}
+	}
+}
+
+func (h *Hub) broadcastToChannelExcept(channelID string, message *Message, exceptClient *Client) {
+	h.mu.RLock()
+	clients := h.channelClients[channelID]
+	h.mu.RUnlock()
+
+	for client := range clients {
+		if client != exceptClient {
+			select {
+			case client.send <- h.messageToBytes(message):
+			default:
+				h.unregisterClient(client)
+			}
+		}
+	}
+}
+
+func (h *Hub) broadcastToUser(userID string, message *Message) {
+	h.mu.RLock()
+	clients := h.userClients[userID]
+	h.mu.RUnlock()
+
+	for client := range clients {
+		select {
+		case client.send <- h.messageToBytes(message):
+		default:
+			h.unregisterClient(client)
+		}
+	}
+}
+
+// =============================================================================
+// STEP 7: Redis PubSub Integration
+// =============================================================================
+
+func (h *Hub) subscribeToRedis() {
+	// Subscribe to all channel patterns
+	h.pubsub = h.redisService.PSubscribe(h.ctx, "chat:channel:*", "channel:*:events", "user:*:notifications")
+
+	go h.handleRedisMessages()
+}
+
+func (h *Hub) handleRedisMessages() {
+	ch := h.pubsub.Channel()
+
+	for {
+		select {
+		case msg := <-ch:
+			h.processRedisMessage(msg)
+		case <-h.ctx.Done():
+			return
+		}
+	}
+}
+
+func (h *Hub) processRedisMessage(msg *redis.Message) {
+	var message Message
+	if err := json.Unmarshal([]byte(msg.Payload), &message); err != nil {
+		slog.Error("Failed to unmarshal Redis message", "error", err)
+		return
+	}
+
+	// Determine routing based on channel pattern
+	switch {
+	case len(msg.Channel) > 13 && msg.Channel[:13] == "chat:channel:":
+		// Channel message: chat:channel:{channel_id}
+		channelID := msg.Channel[13:]
+		h.broadcastToChannel(channelID, &message)
+
+	case len(msg.Channel) > 8 && msg.Channel[:8] == "channel:":
+		// Channel events: channel:{channel_id}:events
+		if len(msg.Channel) > 15 && msg.Channel[len(msg.Channel)-7:] == ":events" {
+			channelID := msg.Channel[8 : len(msg.Channel)-7]
+			h.broadcastToChannel(channelID, &message)
+		}
+
+	case len(msg.Channel) > 5 && msg.Channel[:5] == "user:":
+		// User notifications: user:{user_id}:notifications
+		if len(msg.Channel) > 18 && msg.Channel[len(msg.Channel)-13:] == ":notifications" {
+			userID := msg.Channel[5 : len(msg.Channel)-14]
+			h.broadcastToUser(userID, &message)
+		}
+	}
+}
+
+// =============================================================================
+// Helper Functions
+// =============================================================================
+
+func (h *Hub) messageToBytes(message *Message) []byte {
+	data, err := json.Marshal(message)
+	if err != nil {
+		slog.Error("Failed to marshal message", "error", err)
+		return nil
+	}
+	return data
+}
+
+func (h *Hub) mapToStruct(data map[string]interface{}, dest interface{}) error {
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(jsonBytes, dest)
+}
+
+func (h *Hub) canUserJoinChannel(userID, channelID string) (bool, error) {
+	// Implement your channel permission logic here
+	// For now, allow all users to join all channels
+	return true, nil
 }
