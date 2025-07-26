@@ -1,0 +1,183 @@
+package ws
+
+import (
+	"context"
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/redis/go-redis/v9"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+)
+
+// MockRedisClient is a mock implementation of the Redis client
+type MockRedisClient struct {
+	mock.Mock
+}
+
+// Ping mocks the Redis Ping method
+func (m *MockRedisClient) Ping(ctx context.Context) *redis.StatusCmd {
+	args := m.Called(ctx)
+	return args.Get(0).(*redis.StatusCmd)
+}
+
+// Publish mocks the Redis Publish method
+func (m *MockRedisClient) Publish(ctx context.Context, channel string, message interface{}) *redis.IntCmd {
+	args := m.Called(ctx, channel, message)
+	return args.Get(0).(*redis.IntCmd)
+}
+
+// Subscribe mocks the Redis Subscribe method
+func (m *MockRedisClient) Subscribe(ctx context.Context, channels ...string) *redis.PubSub {
+	args := m.Called(ctx, channels)
+	return args.Get(0).(*redis.PubSub)
+}
+
+// TestRedisErrorHandlerReconnection tests the Redis error handler reconnection logic
+func TestRedisErrorHandlerReconnection(t *testing.T) {
+	// Create a mock Redis client
+	mockRedis := new(MockRedisClient)
+
+	// Create a hub with the mock Redis client
+	hub := &Hub{
+		Redis: mockRedis,
+	}
+
+	// Create a Redis error handler with a short reconnect delay for testing
+	handler := NewRedisErrorHandler(hub)
+	handler.reconnectDelay = 10 * time.Millisecond
+	handler.maxRetries = 3
+
+	// Set up the mock to fail the first two pings and succeed on the third
+	failedCmd := redis.NewStatusCmd(context.Background())
+	failedCmd.SetErr(redis.ErrClosed)
+
+	successCmd := redis.NewStatusCmd(context.Background())
+	successCmd.SetVal("PONG")
+
+	mockRedis.On("Ping", mock.Anything).Return(failedCmd).Times(2)
+	mockRedis.On("Ping", mock.Anything).Return(successCmd).Once()
+
+	// Handle a Redis error
+	handler.HandlePublishError(1, redis.ErrClosed)
+
+	// Wait for reconnection attempts to complete
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify that Ping was called the expected number of times
+	mockRedis.AssertNumberOfCalls(t, "Ping", 3)
+
+	// Verify that the handler is no longer reconnecting
+	assert.False(t, handler.isReconnecting)
+}
+
+// TestRedisErrorHandlerCircuitBreaker tests the circuit breaker functionality
+func TestRedisErrorHandlerCircuitBreaker(t *testing.T) {
+	// Create a mock Redis client
+	mockRedis := new(MockRedisClient)
+
+	// Create a hub with the mock Redis client
+	hub := &Hub{
+		Redis: mockRedis,
+	}
+
+	// Create a Redis error handler with a short circuit timeout for testing
+	handler := NewRedisErrorHandler(hub)
+	handler.circuitOpenTimeout = 50 * time.Millisecond
+
+	// Set up the mock to always fail pings
+	failedCmd := redis.NewStatusCmd(context.Background())
+	failedCmd.SetErr(redis.ErrClosed)
+
+	mockRedis.On("Ping", mock.Anything).Return(failedCmd)
+
+	// Trigger multiple errors to open the circuit
+	for i := 0; i < 3; i++ {
+		handler.HandlePublishError(1, redis.ErrClosed)
+	}
+
+	// Verify that the circuit is open
+	assert.True(t, handler.isCircuitOpen())
+
+	// Wait for the circuit timeout to expire
+	time.Sleep(60 * time.Millisecond)
+
+	// Manually close the circuit (in production this would happen automatically)
+	handler.closeCircuit()
+
+	// Verify that the circuit is closed
+	assert.False(t, handler.isCircuitOpen())
+}
+
+// TestRedisErrorHandlerHealthCheck tests the health check functionality
+func TestRedisErrorHandlerHealthCheck(t *testing.T) {
+	// Create a mock Redis client
+	mockRedis := new(MockRedisClient)
+
+	// Create a hub with the mock Redis client
+	hub := &Hub{
+		Redis: mockRedis,
+	}
+
+	// Create a Redis error handler
+	handler := NewRedisErrorHandler(hub)
+
+	// Set up the mock to alternate between success and failure
+	successCmd := redis.NewStatusCmd(context.Background())
+	successCmd.SetVal("PONG")
+
+	failedCmd := redis.NewStatusCmd(context.Background())
+	failedCmd.SetErr(errors.New("connection refused"))
+
+	mockRedis.On("Ping", mock.Anything).Return(successCmd).Once()
+	mockRedis.On("Ping", mock.Anything).Return(failedCmd).Once()
+	mockRedis.On("Ping", mock.Anything).Return(successCmd).Once()
+
+	// Start health check with a short interval
+	handler.MonitorRedisConnection(20 * time.Millisecond)
+
+	// Wait for health checks to run
+	time.Sleep(70 * time.Millisecond)
+
+	// Stop health check
+	handler.StopHealthCheck()
+
+	// Verify that Ping was called at least twice
+	mockRedis.AssertNumberOfCalls(t, "Ping", 3)
+
+	// Verify error stats
+	stats := handler.GetRedisErrorStats()
+	assert.Equal(t, 1, stats["errorCount"])
+}
+
+// TestRedisErrorHandlerErrorTracking tests the error tracking functionality
+func TestRedisErrorHandlerErrorTracking(t *testing.T) {
+	// Create a mock Redis client
+	mockRedis := new(MockRedisClient)
+
+	// Create a hub with the mock Redis client
+	hub := &Hub{
+		Redis: mockRedis,
+	}
+
+	// Create a Redis error handler
+	handler := NewRedisErrorHandler(hub)
+
+	// Handle multiple errors
+	handler.HandlePublishError(1, errors.New("error 1"))
+	handler.HandleSubscribeError(errors.New("error 2"))
+
+	// Verify error stats
+	stats := handler.GetRedisErrorStats()
+	assert.Equal(t, 2, stats["errorCount"])
+	assert.Equal(t, 2, stats["consecutiveErrors"])
+
+	// Reset error stats
+	handler.ResetErrorStats()
+
+	// Verify stats were reset
+	stats = handler.GetRedisErrorStats()
+	assert.Equal(t, 0, stats["errorCount"])
+	assert.Equal(t, 0, stats["consecutiveErrors"])
+}

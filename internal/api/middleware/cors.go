@@ -11,7 +11,6 @@ import (
 func CORS() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-
 		// Define allowed origins
 		allowedOrigins := []string{
 			"http://localhost:3000",
@@ -19,7 +18,6 @@ func CORS() gin.HandlerFunc {
 			"https://notify-chat.netlify.app",
 			"http://127.0.0.1:3000",
 		}
-
 		// Add custom origins from environment variable if set
 		if customOrigins := os.Getenv("ALLOWED_ORIGINS"); customOrigins != "" {
 			for _, customOrigin := range strings.Split(customOrigins, ",") {
