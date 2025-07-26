@@ -9,8 +9,17 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func Auth() gin.HandlerFunc {
-	jwtSecret := "secret"
+type AuthMiddleware struct {
+	jwtSecret string
+}
+
+func NewAuthMiddleware(jwtSecret string) *AuthMiddleware {
+	return &AuthMiddleware{
+		jwtSecret: jwtSecret,
+	}
+}
+
+func (am *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -22,12 +31,12 @@ func Auth() gin.HandlerFunc {
 
 		tokenString := strings.Replace(authHeader, "Bearer ", "", 1)
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			return []byte(jwtSecret), nil // Use environment variable in production
+			return []byte(am.jwtSecret), nil // Use environment variable in production
 		})
 
 		if err != nil || !token.Valid {
-			c.Set("error", "invalid token: ")
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token: " + jwtSecret})
+			c.Set("error", "invalid token: "+am.jwtSecret)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token: " + am.jwtSecret})
 			c.Abort()
 			return
 		}

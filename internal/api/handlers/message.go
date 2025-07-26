@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"chat-service/internal/api/middleware"
 	"chat-service/internal/models"
 	"chat-service/internal/repositories/postgres"
 	"chat-service/internal/services"
@@ -27,9 +26,8 @@ func NewChatHandler(channelService *services.ChannelService, chatRepo *postgres.
 func (h *ChatHandler) RegisterRoutes(r *gin.RouterGroup) {
 	chats := r.Group("/chats")
 	{
-		chats.Use(middleware.Auth())
 		chats.GET("/channel/:id", h.GetChannelMessages)
-		chats.POST("/", h.CreateChatMessage)
+		chats.POST("/", h.SendMessage)
 	}
 }
 
@@ -89,7 +87,7 @@ func (h *ChatHandler) GetChannelMessages(c *gin.Context) {
 	c.JSON(http.StatusOK, responses)
 }
 
-// CreateChatMessage godoc
+// SendMessage godoc
 // @Summary Create a new chat message
 // @Description Create a new chat message (channel or direct)
 // @Tags chats
@@ -102,7 +100,7 @@ func (h *ChatHandler) GetChannelMessages(c *gin.Context) {
 // @Failure 401 {object} map[string]interface{} "Unauthorized - invalid or missing token"
 // @Failure 500 {object} map[string]interface{} "Internal server error"
 // @Router /chats/ [post]
-func (h *ChatHandler) CreateChatMessage(c *gin.Context) {
+func (h *ChatHandler) SendMessage(c *gin.Context) {
 	userID := c.MustGet("user_id").(uint)
 	var req models.ChatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -122,24 +120,8 @@ func (h *ChatHandler) CreateChatMessage(c *gin.Context) {
 		return
 	}
 
-	// Send message to WebSocket clients
-	msg := &websocket.Message{
-		ID:   "", // Let the frontend or hub assign if needed
-		Type: websocket.MessageTypeChannelMessage,
-		Data: map[string]interface{}{
-			"channel_id": chat.ChannelID,
-			"content":    chat.Text,
-			"sender_id":  chat.SenderID,
-			"file_name":  chat.FileName,
-			"url":        chat.URL,
-		},
-		Timestamp: chat.CreatedAt.Unix(),
-		UserID:    strconv.FormatUint(uint64(chat.SenderID), 10),
-	}
-	if err := h.hub.RedisService().PublishChannelMessage(h.hub.Context(), strconv.FormatUint(uint64(chat.ChannelID), 10), msg); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to publish chat message to channel"})
-		return
-	}
+	// TODO: Implement WebSocket broadcasting for real-time messaging
+	// The hub will handle Redis publishing internally when WebSocket clients are connected
 
 	// Optionally preload sender for response
 	response := models.ChatResponse{

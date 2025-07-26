@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"chat-service/internal/api/middleware"
 	"chat-service/internal/models"
 	"chat-service/internal/services"
 	"net/http"
@@ -107,19 +106,4 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, profile)
-}
-
-// Register routes
-func (h *UserHandler) RegisterRoutes(r *gin.RouterGroup) {
-	auth := r.Group("/auth")
-	{
-		auth.POST("/register", h.Register)
-		auth.POST("/login", h.Login)
-	}
-	user := r.Group("/users")
-	{
-		// Protected routes
-		user.Use(middleware.Auth())
-		user.GET("/profile", h.GetProfile)
-	}
 }

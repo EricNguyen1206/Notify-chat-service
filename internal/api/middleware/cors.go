@@ -3,7 +3,7 @@ package middleware
 import (
 	"os"
 	"strings"
-	
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -11,7 +11,6 @@ import (
 func CORS() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		
 		// Define allowed origins
 		allowedOrigins := []string{
 			"http://localhost:3000",
@@ -19,14 +18,13 @@ func CORS() gin.HandlerFunc {
 			"https://notify-chat.netlify.app",
 			"http://127.0.0.1:3000",
 		}
-		
 		// Add custom origins from environment variable if set
 		if customOrigins := os.Getenv("ALLOWED_ORIGINS"); customOrigins != "" {
 			for _, customOrigin := range strings.Split(customOrigins, ",") {
 				allowedOrigins = append(allowedOrigins, strings.TrimSpace(customOrigin))
 			}
 		}
-		
+
 		// Check if origin is allowed
 		isAllowed := false
 		for _, allowedOrigin := range allowedOrigins {
@@ -35,7 +33,7 @@ func CORS() gin.HandlerFunc {
 				break
 			}
 		}
-		
+
 		// Set CORS headers if origin is allowed
 		if isAllowed {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
@@ -45,11 +43,11 @@ func CORS() gin.HandlerFunc {
 				c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
 			}
 		}
-		
+
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Max-Age", "86400") // 24 hours
+		c.Writer.Header().Set("Access-Control-Max-Age", "24h")
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
