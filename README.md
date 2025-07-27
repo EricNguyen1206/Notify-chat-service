@@ -162,15 +162,13 @@ Notify-chat-service/
 │       ├── deployment.yaml
 │       └── service.yaml
 │
-├── scripts/                      # Build and deployment scripts
-│   ├── build.sh
-│   ├── migrate.sh
-│   └── seed.sh                   # Database seeding script
-│
-├── docs/                         # Documentation
-│   ├── api.md                    # API documentation
-│   ├── websocket.md              # WebSocket protocol documentation
-│   └── deployment.md             # Deployment guide
+# NOTE: scripts/ directory removed - all build and deployment logic
+# has been consolidated into the Makefile for better maintainability
+#
+├── docs/                         # API Documentation
+│   ├── docs.go                   # api doc generate by swaggo/swag
+│   ├── swagger.json              # 
+│   └── swagger.yaml              # 
 │
 ├── .env.example                  # Environment variables template
 ├── .gitignore
@@ -420,7 +418,7 @@ go tool cover -html=coverage.out -o coverage.html
 2. **Build for Production**
    ```bash
    # Optimized build
-   CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o main cmd/api/main.go
+   CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o main cmd/server/main.go
    ```
 
 3. **Docker Deployment**
@@ -471,7 +469,7 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 Your Name - [@your_twitter](https://twitter.com/your_twitter) - email@example.com
 
-Project Link: [https://github.com/your-username/notify-chat-service](https://github.com/your-username/notify-chat-service)
+Project Link: [https://github.com/EricNguyen1206/Notify-chat-service](https://github.com/EricNguyen1206/Notify-chat-service)
 
 ## 🙏 Acknowledgments
 

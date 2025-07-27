@@ -35,15 +35,18 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.LoginRequest"
+                            "$ref": "#/definitions/chat-service_internal_models.LoginRequest"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Login successful - returns JWT token and user data",
+                        "description": "Login successful - returns JWT token",
                         "schema": {
-                            "$ref": "#/definitions/models.LoginResponse"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "400": {
@@ -90,7 +93,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.RegisterRequest"
+                            "$ref": "#/definitions/chat-service_internal_models.RegisterRequest"
                         }
                     }
                 ],
@@ -98,7 +101,7 @@ const docTemplate = `{
                     "201": {
                         "description": "User created successfully",
                         "schema": {
-                            "$ref": "#/definitions/models.UserResponse"
+                            "$ref": "#/definitions/chat-service_internal_models.UserResponse"
                         }
                     },
                     "400": {
@@ -142,7 +145,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.ChannelListResponse"
+                                "$ref": "#/definitions/chat-service_internal_models.ChannelListResponse"
                             }
                         }
                     },
@@ -197,7 +200,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Channel created successfully",
                         "schema": {
-                            "$ref": "#/definitions/models.ChannelResponse"
+                            "$ref": "#/definitions/chat-service_internal_models.ChannelResponse"
                         }
                     },
                     "400": {
@@ -255,7 +258,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Channel details retrieved successfully",
                         "schema": {
-                            "$ref": "#/definitions/models.ChannelResponse"
+                            "$ref": "#/definitions/chat-service_internal_models.ChannelResponse"
                         }
                     },
                     "401": {
@@ -619,7 +622,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.ChatRequest"
+                            "$ref": "#/definitions/chat-service_internal_models.ChatRequest"
                         }
                     }
                 ],
@@ -627,7 +630,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Chat message created",
                         "schema": {
-                            "$ref": "#/definitions/models.ChatResponse"
+                            "$ref": "#/definitions/chat-service_internal_models.ChatResponse"
                         }
                     },
                     "400": {
@@ -687,7 +690,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.ChatResponse"
+                                "$ref": "#/definitions/chat-service_internal_models.ChatResponse"
                             }
                         }
                     },
@@ -715,32 +718,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/health": {
-            "get": {
-                "description": "Check if the API is running",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "health"
-                ],
-                "summary": "Health check",
-                "responses": {
-                    "200": {
-                        "description": "API is healthy",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/users/profile": {
             "get": {
                 "security": [
@@ -763,7 +740,7 @@ const docTemplate = `{
                     "200": {
                         "description": "User profile retrieved successfully",
                         "schema": {
-                            "$ref": "#/definitions/models.UserResponse"
+                            "$ref": "#/definitions/chat-service_internal_models.UserResponse"
                         }
                     },
                     "401": {
@@ -821,7 +798,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "models.ChannelListResponse": {
+        "chat-service_internal_models.ChannelListResponse": {
             "type": "object",
             "properties": {
                 "createdAt": {
@@ -841,7 +818,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.ChannelResponse": {
+        "chat-service_internal_models.ChannelResponse": {
             "type": "object",
             "properties": {
                 "createdAt": {
@@ -858,7 +835,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.ChatRequest": {
+        "chat-service_internal_models.ChatRequest": {
             "type": "object",
             "required": [
                 "type"
@@ -890,7 +867,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.ChatResponse": {
+        "chat-service_internal_models.ChatResponse": {
             "type": "object",
             "properties": {
                 "channelId": {
@@ -928,7 +905,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.LoginRequest": {
+        "chat-service_internal_models.LoginRequest": {
             "type": "object",
             "required": [
                 "email",
@@ -943,32 +920,29 @@ const docTemplate = `{
                 }
             }
         },
-        "models.LoginResponse": {
+        "chat-service_internal_models.RegisterRequest": {
             "type": "object",
-            "properties": {
-                "token": {
-                    "type": "string"
-                },
-                "user": {
-                    "$ref": "#/definitions/models.UserResponse"
-                }
-            }
-        },
-        "models.RegisterRequest": {
-            "type": "object",
+            "required": [
+                "email",
+                "password",
+                "username"
+            ],
             "properties": {
                 "email": {
                     "type": "string"
                 },
                 "password": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 6
                 },
                 "username": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 3
                 }
             }
         },
-        "models.UserResponse": {
+        "chat-service_internal_models.UserResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -985,17 +959,25 @@ const docTemplate = `{
                 }
             }
         }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "Type \"Bearer\" followed by a space and JWT token.",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
     }
 }`
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "",
-	Host:             "",
-	BasePath:         "",
+	Version:          "1.0",
+	Host:             "localhost:8080",
+	BasePath:         "/api/v1",
 	Schemes:          []string{},
-	Title:            "",
-	Description:      "",
+	Title:            "Notify Chat Service API",
+	Description:      "A RESTful API service for chat functionality",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",
