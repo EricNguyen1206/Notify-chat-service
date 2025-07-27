@@ -10,6 +10,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 )
+
 /*
 Redis Data Structures Used:
 
@@ -43,7 +44,15 @@ type RedisClient struct {
 }
 
 func NewRedisConnection(cfg *config.RedisConfig) (*RedisClient, error) {
-	opt, _ := redis.ParseURL(cfg.URI)
+	if cfg.URI == "" {
+		return nil, fmt.Errorf("Redis URI is empty, check your configuration")
+	}
+
+	opt, err := redis.ParseURL(cfg.URI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse Redis URL: %w", err)
+	}
+
 	rdb := redis.NewClient(opt)
 
 	// Test connection

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log/slog"
 	"sync"
 	"time"
 
@@ -54,12 +55,28 @@ type JWTConfig struct {
 func LoadConfig() (*Config, error) {
 	// Viper setup
 	once.Do(func() {
+		// Set up Viper to read from .env file
+		viper.SetConfigName(".env")
+		viper.SetConfigType("env")
+		viper.AddConfigPath(".")
+		viper.AddConfigPath("./configs")
+
+		// Read .env file if it exists
+		if err := viper.ReadInConfig(); err != nil {
+			if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+				slog.Warn("Error reading config file", "error", err)
+			}
+		}
+
+		// Set defaults
+		viper.SetDefault("NOTIFY_HOST", "localhost")
 		viper.SetDefault("NOTIFY_PORT", "8080")
 		viper.SetDefault("NOTIFY_READ_TIMEOUT", 30*time.Second)
 		viper.SetDefault("NOTIFY_WRITE_TIMEOUT", 30*time.Second)
-		viper.SetDefault("NOTIFY_JWT_SECRET", "secret")
+		viper.SetDefault("NOTIFY_IDLE_TIMEOUT", 60*time.Second)
+		viper.SetDefault("NOTIFY_JWT_SECRET", "your-secret-key-change-in-production")
 		viper.SetDefault("NOTIFY_JWT_EXPIRE", "24h")
-		viper.SetDefault("REDIS_URL", "redis://:mypassword@127.0.0.1:6379/0")
+		viper.SetDefault("REDIS_URL", "redis://localhost:6379/0")
 		viper.SetDefault("REDIS_MAX_RETRIES", 3)
 		viper.SetDefault("REDIS_POOL_SIZE", 100)
 		viper.SetDefault("REDIS_MIN_IDLE_CONNS", 10)
@@ -71,8 +88,11 @@ func LoadConfig() (*Config, error) {
 		viper.SetDefault("POSTGRES_HOST", "localhost")
 		viper.SetDefault("POSTGRES_PORT", "5432")
 		viper.SetDefault("POSTGRES_DB", "postgres")
+
+		// Enable environment variable reading
 		viper.AutomaticEnv()
-		// Move ConfigInstance to package level to avoid "declared and not used" error
+
+		// Create config instance
 		ConfigInstance = &Config{
 			Server: ServerConfig{
 				Host:         viper.GetString("NOTIFY_HOST"),
@@ -87,10 +107,9 @@ func LoadConfig() (*Config, error) {
 				User:     viper.GetString("POSTGRES_USER"),
 				Password: viper.GetString("POSTGRES_PASSWORD"),
 				DBName:   viper.GetString("POSTGRES_DB"),
-				// SSLMode:  viper.GetString("DB_SSLMODE", "disable"),
 			},
 			Redis: RedisConfig{
-				URI:          viper.GetString("REDIS_HOST"),
+				URI:          viper.GetString("REDIS_URL"),
 				MaxRetries:   viper.GetInt("REDIS_MAX_RETRIES"),
 				DialTimeout:  viper.GetDuration("REDIS_DIAL_TIMEOUT"),
 				ReadTimeout:  viper.GetDuration("REDIS_READ_TIMEOUT"),
@@ -103,6 +122,15 @@ func LoadConfig() (*Config, error) {
 				ExpirationTime: viper.GetDuration("NOTIFY_JWT_EXPIRE"),
 			},
 		}
+
+		// Log configuration for debugging
+		slog.Info("Configuration loaded",
+			"server_host", ConfigInstance.Server.Host,
+			"server_port", ConfigInstance.Server.Port,
+			"redis_uri", ConfigInstance.Redis.URI,
+			"db_host", ConfigInstance.Database.Host,
+			"db_name", ConfigInstance.Database.DBName,
+		)
 	})
 
 	return ConfigInstance, nil
