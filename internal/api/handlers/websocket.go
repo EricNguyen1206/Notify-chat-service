@@ -15,14 +15,6 @@ func NewWSHandler(hub *websocket.Hub) *WSHandler {
 	return &WSHandler{hub: hub}
 }
 
-// RegisterRoutes maps HTTP methods to handler functions
-func (h *WSHandler) RegisterRoutes(r *gin.RouterGroup) {
-	wsRoutes := r.Group("/ws")
-	{
-		wsRoutes.GET("", h.HandleWebSocket)
-	}
-}
-
 // HandleWebSocket godoc
 // @Summary WebSocket connection
 // @Description Establish a WebSocket connection for real-time messaging

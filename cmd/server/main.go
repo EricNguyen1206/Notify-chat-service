@@ -1,6 +1,18 @@
 package main
 
+// @title           Notify Chat Service API
+// @version         1.0
+// @description     A RESTful API service for chat functionality
+// @host            localhost:8080
+// @BasePath        /api/v1
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
+
 import (
+	_ "chat-service/docs" // Import swagger docs
 	"chat-service/internal/api/routes"
 	"chat-service/internal/config"
 	"chat-service/internal/database"

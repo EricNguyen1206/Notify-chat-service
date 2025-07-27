@@ -22,15 +22,6 @@ func NewChatHandler(channelService *services.ChannelService, chatRepo *postgres.
 	return &ChatHandler{channelService: channelService, chatRepo: chatRepo, hub: hub}
 }
 
-// RegisterRoutes maps HTTP methods to handler functions
-func (h *ChatHandler) RegisterRoutes(r *gin.RouterGroup) {
-	chats := r.Group("/chats")
-	{
-		chats.GET("/channel/:id", h.GetChannelMessages)
-		chats.POST("/", h.SendMessage)
-	}
-}
-
 // GetChannelMessages godoc
 // @Summary Get chat messages in a channel
 // @Description Get all chat messages for a specific channel

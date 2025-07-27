@@ -74,7 +74,7 @@ func LoadConfig() (*Config, error) {
 		viper.SetDefault("NOTIFY_READ_TIMEOUT", 30*time.Second)
 		viper.SetDefault("NOTIFY_WRITE_TIMEOUT", 30*time.Second)
 		viper.SetDefault("NOTIFY_IDLE_TIMEOUT", 60*time.Second)
-		viper.SetDefault("NOTIFY_JWT_SECRET", "your-secret-key-change-in-production")
+		viper.SetDefault("NOTIFY_JWT_SECRET", "your-secret-key")
 		viper.SetDefault("NOTIFY_JWT_EXPIRE", "24h")
 		viper.SetDefault("REDIS_URL", "redis://localhost:6379/0")
 		viper.SetDefault("REDIS_MAX_RETRIES", 3)
