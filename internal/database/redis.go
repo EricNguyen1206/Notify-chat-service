@@ -38,12 +38,48 @@ Redis Data Structures Used:
    SET blacklisted_tokens -> {token1, token2}
 */
 
+/*
+Redis Data Structures Used:
+
+1. User Online Status:
+   SET online_users -> {user1, user2, user3}
+   HASH user:123:status -> {status: "online", last_seen: 1634567890, updated_at: 1634567890}
+
+2. Channel Members:
+   SET channel:general:members -> {user1, user2, user3}
+   SET user:123:channels -> {general, random, tech}
+
+3. Rate Limiting:
+   ZSET rate_limit:message:user123:general -> {timestamp1: score1, timestamp2: score2}
+   ZSET rate_limit:websocket:user123 -> {timestamp1: score1}
+
+4. Migration State:
+   HASH db:migration:status -> {version: "1.0.0", status: "ready", updated_at: 1634567890}
+
+5. PubSub Channels:
+   - chat:channel:general (channel messages)
+   - channel:general:events (channel events)
+   - user:123:notifications (user notifications)
+
+6. Session Management:
+   HASH session:token123 -> {user_id: "123", expires_at: 1634567890}
+   SET blacklisted_tokens -> {token1, token2}
+*/
+
 type RedisClient struct {
 	client *redis.Client
 }
 
 func NewRedisConnection(cfg *config.RedisConfig) (*RedisClient, error) {
-	opt, _ := redis.ParseURL(cfg.URI)
+	if cfg.URI == "" {
+		return nil, fmt.Errorf("Redis URI is empty, check your configuration")
+	}
+
+	opt, err := redis.ParseURL(cfg.URI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse Redis URL: %w", err)
+	}
+
 	rdb := redis.NewClient(opt)
 
 	// Test connection
