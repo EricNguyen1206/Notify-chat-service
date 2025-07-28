@@ -6,6 +6,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// Channel type constants
+const (
+	ChannelTypeDirect  = "direct"
+	ChannelTypeChannel = "channel"
+)
+
 // Channel represents a channel within a category
 type Channel struct {
 	gorm.Model

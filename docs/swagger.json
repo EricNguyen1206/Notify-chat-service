@@ -29,7 +29,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/chat-service_internal_models.LoginRequest"
+                            "$ref": "#/definitions/chat_service_internal_models.LoginRequest"
                         }
                     }
                 ],

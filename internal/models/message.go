@@ -1,10 +1,30 @@
 package models
 
 import (
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
 )
+
+// Validate checks that exactly one of ReceiverID or ChannelID is set for a Chat
+func (c *Chat) Validate() error {
+	if (c.ReceiverID == nil && c.ChannelID == 0) || (c.ReceiverID != nil && c.ChannelID != 0) {
+		return fmt.Errorf("exactly one of ReceiverID or ChannelID must be set")
+	}
+	return nil
+}
+
+// GetType returns the chat type as a string for ChatResponse
+func (c *Chat) GetType() string {
+	if c.ReceiverID != nil {
+		return string(ChatTypeDirect)
+	}
+	if c.ChannelID != 0 {
+		return string(ChatTypeChannel)
+	}
+	return ""
+}
 
 // enum
 type ChatType string
