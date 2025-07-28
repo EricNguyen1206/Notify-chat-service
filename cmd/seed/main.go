@@ -106,7 +106,7 @@ func main() {
 		slog.Warn("Could not find admin user for channel creation", "error", err)
 	} else {
 		// Create general channel
-		generalChannel, err := channelService.CreateChannel("general", admin.ID)
+		generalChannel, err := channelService.CreateChannel("general", admin.ID, "channel")
 		if err != nil {
 			slog.Warn("General channel might already exist", "error", err)
 		} else {
@@ -116,7 +116,7 @@ func main() {
 		// Create multiple channels
 		channels := []string{"random", "development", "design", "testing"}
 		for _, channelName := range channels {
-			channel, err := channelService.CreateChannel(channelName, admin.ID)
+			channel, err := channelService.CreateChannel(channelName, admin.ID, "channel")
 			if err != nil {
 				slog.Warn("Channel might already exist", "name", channelName, "error", err)
 			} else {
@@ -161,64 +161,56 @@ func seedSampleMessages(db *gorm.DB, userRepo *postgres.UserRepository, channelR
 		return err
 	}
 
-	// Sample channel messages
+	// Sample channel messages (using new model fields)
 	channelMessages := []models.Chat{
 		{
 			SenderID:  admin.ID,
 			ChannelID: generalChannel.ID,
-			Type:      string(models.ChatTypeChannel),
 			Text:      stringPtr("Welcome to the general channel! 👋"),
+			// Type is now implicit by ChannelID being set
 		},
 		{
 			SenderID:  alice.ID,
 			ChannelID: generalChannel.ID,
-			Type:      string(models.ChatTypeChannel),
 			Text:      stringPtr("Hi everyone! Excited to be here."),
 		},
 		{
 			SenderID:  bob.ID,
 			ChannelID: generalChannel.ID,
-			Type:      string(models.ChatTypeChannel),
 			Text:      stringPtr("Hello! Looking forward to working together."),
 		},
 		{
 			SenderID:  admin.ID,
 			ChannelID: generalChannel.ID,
-			Type:      string(models.ChatTypeChannel),
 			Text:      stringPtr("Great to have you all here! Let's build something amazing."),
 		},
 	}
 
-	// Create channel messages
 	for _, msg := range channelMessages {
 		if err := db.Create(&msg).Error; err != nil {
 			slog.Warn("Failed to create channel message", "error", err)
 		}
 	}
 
-	// Sample direct messages
+	// Sample direct messages (using new model fields)
 	directMessages := []models.Chat{
 		{
 			SenderID:   admin.ID,
 			ReceiverID: &alice.ID,
-			Type:       string(models.ChatTypeDirect),
 			Text:       stringPtr("Hey Alice, welcome to the team!"),
 		},
 		{
 			SenderID:   alice.ID,
 			ReceiverID: &admin.ID,
-			Type:       string(models.ChatTypeDirect),
 			Text:       stringPtr("Thank you! I'm excited to get started."),
 		},
 		{
 			SenderID:   bob.ID,
 			ReceiverID: &alice.ID,
-			Type:       string(models.ChatTypeDirect),
 			Text:       stringPtr("Hi Alice! If you need any help, feel free to ask."),
 		},
 	}
 
-	// Create direct messages
 	for _, msg := range directMessages {
 		if err := db.Create(&msg).Error; err != nil {
 			slog.Warn("Failed to create direct message", "error", err)

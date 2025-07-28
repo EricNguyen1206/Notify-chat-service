@@ -19,9 +19,8 @@ const (
 type Chat struct {
 	gorm.Model
 
-	SenderID   uint   `gorm:"not null" json:"senderId"`
-	ReceiverID *uint  `gorm:"type:uint" json:"receiverId"`                                               // for direct messages
-	Type       string `gorm:"not null;type:varchar(20);check:type IN ('direct', 'channel')" json:"type"` // Use consts
+	SenderID   uint  `gorm:"not null" json:"senderId"`
+	ReceiverID *uint `gorm:"type:uint" json:"receiverId"` // for direct messages
 
 	ChannelID uint `gorm:"type:uint" json:"channelId"` // only if type == channel
 

@@ -24,7 +24,7 @@ var (
 
 type UserService interface {
 	Register(ctx context.Context, req *models.RegisterRequest) (*models.UserResponse, error)
-	Login(ctx context.Context, req *models.LoginRequest) (string, error)
+	Login(ctx context.Context, req *models.LoginRequest) (*models.LoginResponse, error)
 	GetProfile(ctx context.Context, userID uint) (*models.UserResponse, error)
 	GetUserByEmail(ctx context.Context, email string) (*models.UserResponse, error)
 }
@@ -100,17 +100,30 @@ func (s *userService) Register(ctx context.Context, req *models.RegisterRequest)
 	}, nil
 }
 
-func (s *userService) Login(ctx context.Context, req *models.LoginRequest) (string, error) {
+func (s *userService) Login(ctx context.Context, req *models.LoginRequest) (*models.LoginResponse, error) {
 	user, err := s.repo.FindByEmail(ctx, req.Email)
 	if err != nil {
-		return "", ErrInvalidCredentials
+		return nil, ErrInvalidCredentials
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		return "", ErrInvalidCredentials
+		return nil, ErrInvalidCredentials
 	}
 
-	return s.generateJWT(user)
+	token, err := s.generateJWT(user)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate token: %w", err)
+	}
+
+	return &models.LoginResponse{
+		Token: token,
+		User: models.UserResponse{
+			ID:        user.ID,
+			Email:     user.Email,
+			Username:  user.Username,
+			CreatedAt: user.CreatedAt,
+		},
+	}, nil
 }
 
 func (s *userService) GetProfile(ctx context.Context, userID uint) (*models.UserResponse, error) {

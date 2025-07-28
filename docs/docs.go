@@ -41,12 +41,9 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Login successful - returns JWT token",
+                        "description": "Login successful - returns JWT token and user data",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/chat-service_internal_models.LoginResponse"
                         }
                     },
                     "400": {
@@ -657,7 +654,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/chats/channel/{id}": {
+        "/messages/channel/{id}": {
             "get": {
                 "security": [
                     {
@@ -798,12 +795,43 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "chat-service_internal_models.Channel": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "deleted_at": {
+                    "$ref": "#/definitions/gorm.DeletedAt"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/chat-service_internal_models.User"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "ownerId": {
+                    "description": "userid",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "Use consts",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "chat-service_internal_models.ChannelListResponse": {
             "type": "object",
             "properties": {
-                "createdAt": {
-                    "type": "string"
-                },
                 "id": {
                     "type": "integer"
                 },
@@ -813,7 +841,7 @@ const docTemplate = `{
                 "ownerId": {
                     "type": "integer"
                 },
-                "updatedAt": {
+                "type": {
                     "type": "string"
                 }
             }
@@ -827,8 +855,18 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "members": {
+                    "description": "List of members in the channel",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/chat-service_internal_models.User"
+                    }
+                },
                 "name": {
                     "type": "string"
+                },
+                "ownerId": {
+                    "type": "integer"
                 },
                 "type": {
                     "type": "string"
@@ -920,6 +958,17 @@ const docTemplate = `{
                 }
             }
         },
+        "chat-service_internal_models.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/chat-service_internal_models.UserResponse"
+                }
+            }
+        },
         "chat-service_internal_models.RegisterRequest": {
             "type": "object",
             "required": [
@@ -942,6 +991,35 @@ const docTemplate = `{
                 }
             }
         },
+        "chat-service_internal_models.User": {
+            "type": "object",
+            "properties": {
+                "channels": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/chat-service_internal_models.Channel"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "deleted_at": {
+                    "$ref": "#/definitions/gorm.DeletedAt"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
         "chat-service_internal_models.UserResponse": {
             "type": "object",
             "properties": {
@@ -956,6 +1034,18 @@ const docTemplate = `{
                 },
                 "username": {
                     "type": "string"
+                }
+            }
+        },
+        "gorm.DeletedAt": {
+            "type": "object",
+            "properties": {
+                "time": {
+                    "type": "string"
+                },
+                "valid": {
+                    "description": "Valid is true if Time is not NULL",
+                    "type": "boolean"
                 }
             }
         }

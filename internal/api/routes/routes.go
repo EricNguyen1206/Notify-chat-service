@@ -127,6 +127,7 @@ func (r *Router) SetupRoutes() {
 		}
 
 		// Channel routes
+		const channelUserRoute = "/:id/user"
 		channels := auth.Group("/channels")
 		channels.Use(r.rateLimitMW.RateLimit(100, time.Minute)) // 100 requests per minute
 		{
@@ -137,9 +138,9 @@ func (r *Router) SetupRoutes() {
 			channels.PUT("/:id", r.channelHandler.UpdateChannel)
 			channels.DELETE("/:id", r.channelHandler.DeleteChannel)
 			// user-channel relation logic
-			channels.POST("/:id/user", r.channelHandler.AddUserToChannel)
-			channels.PUT("/:id/user", r.channelHandler.LeaveChannel)
-			channels.DELETE("/:id/user", r.channelHandler.RemoveUserFromChannel)
+			channels.POST(channelUserRoute, r.channelHandler.AddUserToChannel)
+			channels.PUT(channelUserRoute, r.channelHandler.LeaveChannel)
+			channels.DELETE(channelUserRoute, r.channelHandler.RemoveUserFromChannel)
 		}
 
 		// Message routes
@@ -158,7 +159,7 @@ func (r *Router) SetupRoutes() {
 	{
 		// Auth routes
 		authRoutes := public.Group("/auth")
-		authRoutes.Use(r.rateLimitMW.RateLimit(50, time.Minute)) // 50 requests per minute
+		authRoutes.Use(r.rateLimitMW.RateLimitIP(50, time.Minute)) // 50 requests per minute per IP
 		{
 			authRoutes.POST("/register", r.userHandler.Register)
 			authRoutes.POST("/login", r.userHandler.Login)
