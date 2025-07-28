@@ -34,7 +34,7 @@ func NewChatHandler(channelService *services.ChannelService, chatRepo *postgres.
 // @Failure 401 {object} map[string]interface{} "Unauthorized - invalid or missing token"
 // @Failure 404 {object} map[string]interface{} "Channel not found"
 // @Failure 500 {object} map[string]interface{} "Internal server error"
-// @Router /chats/channel/{id} [get]
+// @Router /messages/channel/{id} [get]
 func (h *ChatHandler) GetChannelMessages(c *gin.Context) {
 	channelID, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -65,7 +65,6 @@ func (h *ChatHandler) GetChannelMessages(c *gin.Context) {
 	for _, m := range messages {
 		responses = append(responses, models.ChatResponse{
 			ID:         m.ID,
-			Type:       m.Type,
 			SenderID:   m.SenderID,
 			SenderName: m.Sender.Username,
 			Text:       m.Text,
@@ -100,7 +99,6 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 	}
 	chat := &models.Chat{
 		SenderID:  userID,
-		Type:      req.Type,
 		ChannelID: *req.ChannelID,
 		Text:      req.Text,
 		URL:       req.URL,
@@ -117,7 +115,6 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 	// Optionally preload sender for response
 	response := models.ChatResponse{
 		ID:         chat.ID,
-		Type:       chat.Type,
 		SenderID:   chat.SenderID,
 		SenderName: "", // You may want to fetch sender name if needed
 		Text:       chat.Text,

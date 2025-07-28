@@ -82,6 +82,34 @@ func (rm *RateLimitMiddleware) WebSocketRateLimit(requests int, window time.Dura
 			return
 		}
 
+	c.Next()
+	})
+}
+
+// RateLimitIP creates a rate limiting middleware for public routes based on IP address
+func (rm *RateLimitMiddleware) RateLimitIP(requests int, window time.Duration) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		// Use client IP for the rate limit key
+		clientIP := c.ClientIP()
+		endpoint := c.Request.URL.Path
+		key := fmt.Sprintf("rate_limit_ip:%s:%s", clientIP, endpoint)
+
+		allowed, err := rm.redisService.CheckRateLimit(c.Request.Context(), key, requests, window)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Rate limit check failed"})
+			c.Abort()
+			return
+		}
+
+		if !allowed {
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"error":   "Rate limit exceeded",
+				"message": fmt.Sprintf("Too many requests. Limit: %d per %v", requests, window),
+			})
+			c.Abort()
+			return
+		}
+
 		c.Next()
 	})
 }

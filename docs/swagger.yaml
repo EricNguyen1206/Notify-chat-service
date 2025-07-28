@@ -1,16 +1,39 @@
 basePath: /api/v1
 definitions:
+  chat-service_internal_models.Channel:
+    properties:
+      created_at:
+        type: string
+      deletedAt:
+        type: string
+        format: date-time
+        nullable: true
+      id:
+        type: integer
+      members:
+        items:
+          $ref: "#/definitions/chat-service_internal_models.User"
+        type: array
+      name:
+        type: string
+      ownerId:
+        description: userid
+        type: integer
+      type:
+        description: Use consts
+        type: string
+      updated_at:
+        type: string
+    type: object
   chat-service_internal_models.ChannelListResponse:
     properties:
-      createdAt:
-        type: string
       id:
         type: integer
       name:
         type: string
       ownerId:
         type: integer
-      updatedAt:
+      type:
         type: string
     type: object
   chat-service_internal_models.ChannelResponse:
@@ -19,8 +42,15 @@ definitions:
         type: string
       id:
         type: integer
+      members:
+        description: List of members in the channel
+        items:
+          $ref: "#/definitions/chat-service_internal_models.User"
+        type: array
       name:
         type: string
+      ownerId:
+        type: integer
       type:
         type: string
     type: object
@@ -38,13 +68,13 @@ definitions:
         type: string
       type:
         enum:
-        - direct
-        - channel
+          - direct
+          - channel
         type: string
       url:
         type: string
     required:
-    - type
+      - type
     type: object
   chat-service_internal_models.ChatResponse:
     properties:
@@ -79,8 +109,15 @@ definitions:
       password:
         type: string
     required:
-    - email
-    - password
+      - email
+      - password
+    type: object
+  chat-service_internal_models.LoginResponse:
+    properties:
+      token:
+        type: string
+      user:
+        $ref: "#/definitions/chat-service_internal_models.UserResponse"
     type: object
   chat-service_internal_models.RegisterRequest:
     properties:
@@ -94,9 +131,32 @@ definitions:
         minLength: 3
         type: string
     required:
-    - email
-    - password
-    - username
+      - email
+      - password
+      - username
+    type: object
+  chat-service_internal_models.User:
+    properties:
+      channels:
+        items:
+          $ref: "#/definitions/chat-service_internal_models.Channel"
+        type: array
+      created_at:
+        type: string
+      deleted_at:
+        $ref: "#/definitions/gorm.DeletedAt"
+      deletedAt:
+        type: string
+        format: date-time
+        nullable: true
+      email:
+        type: string
+      id:
+        type: integer
+      updated_at:
+        type: string
+      username:
+        type: string
     type: object
   chat-service_internal_models.UserResponse:
     properties:
@@ -109,6 +169,14 @@ definitions:
       username:
         type: string
     type: object
+  gorm.DeletedAt:
+    properties:
+      time:
+        type: string
+      valid:
+        description: Valid is true if Time is not NULL
+        type: boolean
+    type: object
 host: localhost:8080
 info:
   contact: {}
@@ -119,24 +187,22 @@ paths:
   /auth/login:
     post:
       consumes:
-      - application/json
+        - application/json
       description: Authenticate user with email and password
       parameters:
-      - description: User login credentials
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/chat-service_internal_models.LoginRequest'
+        - description: User login credentials
+          in: body
+          name: request
+          required: true
+          schema:
+            $ref: "#/definitions/chat-service_internal_models.LoginRequest"
       produces:
-      - application/json
+        - application/json
       responses:
         "200":
           description: Login successful - returns JWT token
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: "#/definitions/chat-service_internal_models.LoginResponse"
         "400":
           description: Bad request - invalid input data
           schema:
@@ -154,26 +220,26 @@ paths:
             type: object
       summary: User login
       tags:
-      - auth
+        - auth
   /auth/register:
     post:
       consumes:
-      - application/json
+        - application/json
       description: Register a new user with username, email, and password
       parameters:
-      - description: User registration data
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/chat-service_internal_models.RegisterRequest'
+        - description: User registration data
+          in: body
+          name: request
+          required: true
+          schema:
+            $ref: "#/definitions/chat-service_internal_models.RegisterRequest"
       produces:
-      - application/json
+        - application/json
       responses:
         "201":
           description: User created successfully
           schema:
-            $ref: '#/definitions/chat-service_internal_models.UserResponse'
+            $ref: "#/definitions/chat-service_internal_models.UserResponse"
         "400":
           description: Bad request - invalid input data
           schema:
@@ -186,20 +252,20 @@ paths:
             type: object
       summary: Register a new user
       tags:
-      - auth
+        - auth
   /channels/:
     get:
       consumes:
-      - application/json
+        - application/json
       description: Get all channels that the current user is a member of
       produces:
-      - application/json
+        - application/json
       responses:
         "200":
           description: List of user's channels
           schema:
             items:
-              $ref: '#/definitions/chat-service_internal_models.ChannelListResponse'
+              $ref: "#/definitions/chat-service_internal_models.ChannelListResponse"
             type: array
         "401":
           description: Unauthorized - invalid or missing token
@@ -212,30 +278,30 @@ paths:
             additionalProperties: true
             type: object
       security:
-      - BearerAuth: []
+        - BearerAuth: []
       summary: Get user's channels
       tags:
-      - channels
+        - channels
     post:
       consumes:
-      - application/json
+        - application/json
       description: Create a new channel with the specified name
       parameters:
-      - description: Channel creation data
-        in: body
-        name: request
-        required: true
-        schema:
-          additionalProperties:
-            type: string
-          type: object
+        - description: Channel creation data
+          in: body
+          name: request
+          required: true
+          schema:
+            additionalProperties:
+              type: string
+            type: object
       produces:
-      - application/json
+        - application/json
       responses:
         "200":
           description: Channel created successfully
           schema:
-            $ref: '#/definitions/chat-service_internal_models.ChannelResponse'
+            $ref: "#/definitions/chat-service_internal_models.ChannelResponse"
         "400":
           description: Bad request - invalid input data
           schema:
@@ -252,23 +318,23 @@ paths:
             additionalProperties: true
             type: object
       security:
-      - BearerAuth: []
+        - BearerAuth: []
       summary: Create a new channel
       tags:
-      - channels
+        - channels
   /channels/{id}:
     delete:
       consumes:
-      - application/json
+        - application/json
       description: Delete a channel (only channel owner can delete)
       parameters:
-      - description: Channel ID
-        in: path
-        name: id
-        required: true
-        type: integer
+        - description: Channel ID
+          in: path
+          name: id
+          required: true
+          type: integer
       produces:
-      - application/json
+        - application/json
       responses:
         "200":
           description: Channel deleted successfully
@@ -287,27 +353,27 @@ paths:
             additionalProperties: true
             type: object
       security:
-      - BearerAuth: []
+        - BearerAuth: []
       summary: Delete channel
       tags:
-      - channels
+        - channels
     get:
       consumes:
-      - application/json
+        - application/json
       description: Get detailed information about a specific channel
       parameters:
-      - description: Channel ID
-        in: path
-        name: id
-        required: true
-        type: integer
+        - description: Channel ID
+          in: path
+          name: id
+          required: true
+          type: integer
       produces:
-      - application/json
+        - application/json
       responses:
         "200":
           description: Channel details retrieved successfully
           schema:
-            $ref: '#/definitions/chat-service_internal_models.ChannelResponse'
+            $ref: "#/definitions/chat-service_internal_models.ChannelResponse"
         "401":
           description: Unauthorized - invalid or missing token
           schema:
@@ -319,30 +385,30 @@ paths:
             additionalProperties: true
             type: object
       security:
-      - BearerAuth: []
+        - BearerAuth: []
       summary: Get channel by ID
       tags:
-      - channels
+        - channels
     put:
       consumes:
-      - application/json
+        - application/json
       description: Update the name of an existing channel
       parameters:
-      - description: Channel ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: Channel update data
-        in: body
-        name: request
-        required: true
-        schema:
-          additionalProperties:
-            type: string
-          type: object
+        - description: Channel ID
+          in: path
+          name: id
+          required: true
+          type: integer
+        - description: Channel update data
+          in: body
+          name: request
+          required: true
+          schema:
+            additionalProperties:
+              type: string
+            type: object
       produces:
-      - application/json
+        - application/json
       responses:
         "200":
           description: Channel updated successfully
@@ -366,31 +432,31 @@ paths:
             additionalProperties: true
             type: object
       security:
-      - BearerAuth: []
+        - BearerAuth: []
       summary: Update channel
       tags:
-      - channels
+        - channels
   /channels/{id}/user:
     delete:
       consumes:
-      - application/json
+        - application/json
       description: Remove a user from a channel (only channel owner can remove users)
       parameters:
-      - description: Channel ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: User removal data
-        in: body
-        name: request
-        required: true
-        schema:
-          additionalProperties:
-            type: integer
-          type: object
+        - description: Channel ID
+          in: path
+          name: id
+          required: true
+          type: integer
+        - description: User removal data
+          in: body
+          name: request
+          required: true
+          schema:
+            additionalProperties:
+              type: integer
+            type: object
       produces:
-      - application/json
+        - application/json
       responses:
         "200":
           description: User removed from channel successfully
@@ -414,30 +480,30 @@ paths:
             additionalProperties: true
             type: object
       security:
-      - BearerAuth: []
+        - BearerAuth: []
       summary: Remove user from channel
       tags:
-      - channels
+        - channels
     post:
       consumes:
-      - application/json
+        - application/json
       description: Add a user to a channel (only channel owner can add users)
       parameters:
-      - description: Channel ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: User addition data
-        in: body
-        name: request
-        required: true
-        schema:
-          additionalProperties:
-            type: integer
-          type: object
+        - description: Channel ID
+          in: path
+          name: id
+          required: true
+          type: integer
+        - description: User addition data
+          in: body
+          name: request
+          required: true
+          schema:
+            additionalProperties:
+              type: integer
+            type: object
       produces:
-      - application/json
+        - application/json
       responses:
         "200":
           description: User added to channel successfully
@@ -461,22 +527,22 @@ paths:
             additionalProperties: true
             type: object
       security:
-      - BearerAuth: []
+        - BearerAuth: []
       summary: Add user to channel
       tags:
-      - channels
+        - channels
     put:
       consumes:
-      - application/json
+        - application/json
       description: Remove the current user from a channel
       parameters:
-      - description: Channel ID
-        in: path
-        name: id
-        required: true
-        type: integer
+        - description: Channel ID
+          in: path
+          name: id
+          required: true
+          type: integer
       produces:
-      - application/json
+        - application/json
       responses:
         "200":
           description: User left channel successfully
@@ -495,29 +561,29 @@ paths:
             additionalProperties: true
             type: object
       security:
-      - BearerAuth: []
+        - BearerAuth: []
       summary: Leave channel
       tags:
-      - channels
+        - channels
   /chats/:
     post:
       consumes:
-      - application/json
+        - application/json
       description: Create a new chat message (channel or direct)
       parameters:
-      - description: Chat message data
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/chat-service_internal_models.ChatRequest'
+        - description: Chat message data
+          in: body
+          name: request
+          required: true
+          schema:
+            $ref: "#/definitions/chat-service_internal_models.ChatRequest"
       produces:
-      - application/json
+        - application/json
       responses:
         "201":
           description: Chat message created
           schema:
-            $ref: '#/definitions/chat-service_internal_models.ChatResponse'
+            $ref: "#/definitions/chat-service_internal_models.ChatResponse"
         "400":
           description: Bad request - invalid input data
           schema:
@@ -534,29 +600,29 @@ paths:
             additionalProperties: true
             type: object
       security:
-      - BearerAuth: []
+        - BearerAuth: []
       summary: Create a new chat message
       tags:
-      - chats
-  /chats/channel/{id}:
+        - chats
+  /messages/channel/{id}:
     get:
       consumes:
-      - application/json
+        - application/json
       description: Get all chat messages for a specific channel
       parameters:
-      - description: Channel ID
-        in: path
-        name: id
-        required: true
-        type: integer
+        - description: Channel ID
+          in: path
+          name: id
+          required: true
+          type: integer
       produces:
-      - application/json
+        - application/json
       responses:
         "200":
           description: List of chat messages
           schema:
             items:
-              $ref: '#/definitions/chat-service_internal_models.ChatResponse'
+              $ref: "#/definitions/chat-service_internal_models.ChatResponse"
             type: array
         "401":
           description: Unauthorized - invalid or missing token
@@ -574,22 +640,22 @@ paths:
             additionalProperties: true
             type: object
       security:
-      - BearerAuth: []
+        - BearerAuth: []
       summary: Get chat messages in a channel
       tags:
-      - chats
+        - chats
   /users/profile:
     get:
       consumes:
-      - application/json
+        - application/json
       description: Get the current user's profile information
       produces:
-      - application/json
+        - application/json
       responses:
         "200":
           description: User profile retrieved successfully
           schema:
-            $ref: '#/definitions/chat-service_internal_models.UserResponse'
+            $ref: "#/definitions/chat-service_internal_models.UserResponse"
         "401":
           description: Unauthorized - invalid or missing token
           schema:
@@ -601,23 +667,23 @@ paths:
             additionalProperties: true
             type: object
       security:
-      - BearerAuth: []
+        - BearerAuth: []
       summary: Get user profile
       tags:
-      - users
+        - users
   /ws:
     get:
       consumes:
-      - application/json
+        - application/json
       description: Establish a WebSocket connection for real-time messaging
       parameters:
-      - description: User ID for WebSocket connection
-        in: query
-        name: userId
-        required: true
-        type: string
+        - description: User ID for WebSocket connection
+          in: query
+          name: userId
+          required: true
+          type: string
       produces:
-      - application/json
+        - application/json
       responses:
         "101":
           description: Switching Protocols - WebSocket connection established
@@ -628,7 +694,7 @@ paths:
             type: object
       summary: WebSocket connection
       tags:
-      - websocket
+        - websocket
 securityDefinitions:
   BearerAuth:
     description: Type "Bearer" followed by a space and JWT token.

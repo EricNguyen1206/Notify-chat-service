@@ -31,18 +31,17 @@ func (s *ChannelService) GetUserChannels(userID uint) ([]models.ChannelListRespo
 	var response []models.ChannelListResponse
 	for _, channel := range channels {
 		response = append(response, models.ChannelListResponse{
-			ID:        channel.ID,
-			Name:      channel.Name,
-			OwnerID:   channel.OwnerID,
-			CreatedAt: channel.CreatedAt,
-			UpdatedAt: channel.UpdatedAt,
+			ID:      channel.ID,
+			Name:    channel.Name,
+			Type:    channel.Type,
+			OwnerID: channel.OwnerID,
 		})
 	}
 
 	return response, nil
 }
 
-func (s *ChannelService) CreateChannel(name string, ownerID uint) (*models.Channel, error) {
+func (s *ChannelService) CreateChannel(name string, ownerID uint, chanType string) (*models.Channel, error) {
 	owner, err := s.userRepo.FindByID(ownerID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -54,6 +53,7 @@ func (s *ChannelService) CreateChannel(name string, ownerID uint) (*models.Chann
 		Name:    name,
 		OwnerID: ownerID,
 		Members: []*models.User{owner},
+		Type:    chanType,
 	}
 	err = s.repo.Create(channel)
 	return channel, err

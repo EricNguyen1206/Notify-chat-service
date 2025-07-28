@@ -48,7 +48,7 @@ func main() {
 		log.Fatal("Failed to ping database:", err)
 	}
 
-	// Run auto migration for all models
+	// Run auto migration for all models (order matters for foreign keys)
 	slog.Info("Migrating User model...")
 	if err := db.AutoMigrate(&models.User{}); err != nil {
 		log.Fatal("Failed to migrate User model:", err)
@@ -59,7 +59,7 @@ func main() {
 		log.Fatal("Failed to migrate Channel model:", err)
 	}
 
-	slog.Info("Migrating Chat model...")
+	slog.Info("Migrating Chat (message) model...")
 	if err := db.AutoMigrate(&models.Chat{}); err != nil {
 		log.Fatal("Failed to migrate Chat model:", err)
 	}
@@ -79,10 +79,10 @@ func createIndexes(db *gorm.DB) error {
 		"CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);",
 		"CREATE INDEX IF NOT EXISTS idx_users_username ON users (username);",
 		"CREATE INDEX IF NOT EXISTS idx_channels_owner_id ON channels (owner_id);",
+		"CREATE INDEX IF NOT EXISTS idx_channels_type ON channels (type);",
 		"CREATE INDEX IF NOT EXISTS idx_chats_sender_id ON chats (sender_id);",
 		"CREATE INDEX IF NOT EXISTS idx_chats_receiver_id ON chats (receiver_id);",
 		"CREATE INDEX IF NOT EXISTS idx_chats_channel_id ON chats (channel_id);",
-		"CREATE INDEX IF NOT EXISTS idx_chats_type ON chats (type);",
 		"CREATE INDEX IF NOT EXISTS idx_chats_created_at ON chats (created_at);",
 	}
 

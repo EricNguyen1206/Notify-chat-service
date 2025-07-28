@@ -1,10 +1,30 @@
 package models
 
 import (
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
 )
+
+// Validate checks that exactly one of ReceiverID or ChannelID is set for a Chat
+func (c *Chat) Validate() error {
+	if (c.ReceiverID == nil && c.ChannelID == 0) || (c.ReceiverID != nil && c.ChannelID != 0) {
+		return fmt.Errorf("exactly one of ReceiverID or ChannelID must be set")
+	}
+	return nil
+}
+
+// GetType returns the chat type as a string for ChatResponse
+func (c *Chat) GetType() string {
+	if c.ReceiverID != nil {
+		return string(ChatTypeDirect)
+	}
+	if c.ChannelID != 0 {
+		return string(ChatTypeChannel)
+	}
+	return ""
+}
 
 // enum
 type ChatType string
@@ -19,9 +39,8 @@ const (
 type Chat struct {
 	gorm.Model
 
-	SenderID   uint   `gorm:"not null" json:"senderId"`
-	ReceiverID *uint  `gorm:"type:uint" json:"receiverId"`                                               // for direct messages
-	Type       string `gorm:"not null;type:varchar(20);check:type IN ('direct', 'channel')" json:"type"` // Use consts
+	SenderID   uint  `gorm:"not null" json:"senderId"`
+	ReceiverID *uint `gorm:"type:uint" json:"receiverId"` // for direct messages
 
 	ChannelID uint `gorm:"type:uint" json:"channelId"` // only if type == channel
 

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"chat-service/internal/models"
 	"chat-service/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -12,6 +13,9 @@ import (
 type ChannelHandler struct {
 	channelService *services.ChannelService
 }
+
+// Ensure models package is imported for Swagger generation
+var _ models.ChannelListResponse
 
 func NewChannelHandler(channelService *services.ChannelService) *ChannelHandler {
 	return &ChannelHandler{channelService: channelService}
@@ -55,12 +59,13 @@ func (h *ChannelHandler) CreateChannel(c *gin.Context) {
 	userID := c.MustGet("user_id").(uint)
 	var req struct {
 		Name string `json:"name"`
+		Type string `json:"type"` // Optional: specify channel type if needed
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	channel, err := h.channelService.CreateChannel(req.Name, userID)
+	channel, err := h.channelService.CreateChannel(req.Name, userID, req.Type)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create channel"})
 		return
@@ -140,7 +145,23 @@ func (h *ChannelHandler) GetChannelByID(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Channel not found"})
 		return
 	}
-	c.JSON(http.StatusOK, channel)
+
+	// Build ChannelResponse with members
+	members := make([]models.User, 0, len(channel.Members))
+	for _, m := range channel.Members {
+		if m != nil {
+			members = append(members, *m)
+		}
+	}
+	resp := models.ChannelResponse{
+		ID:        channel.ID,
+		Name:      channel.Name,
+		Type:      channel.Type,
+		CreatedAt: channel.CreatedAt,
+		OwnerID:   channel.OwnerID,
+		Members:   members,
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 // AddUserToChannel godoc
