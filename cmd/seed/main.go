@@ -161,7 +161,7 @@ func seedSampleMessages(db *gorm.DB, userRepo *postgres.UserRepository, channelR
 		return err
 	}
 
-	// Sample channel messages
+	// Sample channel messages (using new model fields)
 	channelMessages := []models.Chat{
 		{
 			SenderID:  admin.ID,
@@ -186,14 +186,13 @@ func seedSampleMessages(db *gorm.DB, userRepo *postgres.UserRepository, channelR
 		},
 	}
 
-	// Create channel messages
 	for _, msg := range channelMessages {
 		if err := db.Create(&msg).Error; err != nil {
 			slog.Warn("Failed to create channel message", "error", err)
 		}
 	}
 
-	// Sample direct messages
+	// Sample direct messages (using new model fields)
 	directMessages := []models.Chat{
 		{
 			SenderID:   admin.ID,
@@ -212,7 +211,6 @@ func seedSampleMessages(db *gorm.DB, userRepo *postgres.UserRepository, channelR
 		},
 	}
 
-	// Create direct messages
 	for _, msg := range directMessages {
 		if err := db.Create(&msg).Error; err != nil {
 			slog.Warn("Failed to create direct message", "error", err)

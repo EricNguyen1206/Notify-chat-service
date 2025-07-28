@@ -41,7 +41,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Login successful - returns JWT token",
+                        "description": "Login successful - returns JWT token and user data",
                         "schema": {
                             "$ref": "#/definitions/chat-service_internal_models.LoginResponse"
                             "type": "object",
