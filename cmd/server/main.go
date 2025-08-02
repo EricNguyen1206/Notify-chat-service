@@ -12,7 +12,7 @@ package main
 // @description Type "Bearer" followed by a space and JWT token.
 
 import (
-	_ "chat-service/docs" // Import swagger docs
+	// _ "chat-service/docs" // Import swagger docs
 	"chat-service/internal/api/routes"
 	"chat-service/internal/config"
 	"chat-service/internal/database"
