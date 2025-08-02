@@ -19,8 +19,8 @@ COPY . .
 # - CGO_ENABLED=0: Disables CGO for static linking
 # - GOOS=linux: Ensures Linux-compatible binary
 # - -o main: Output filename
-# - ./cmd/api/main.go: Entry point of the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/api/main.go
+# - ./cmd/server/main.go: Entry point of the application
+RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/server/main.go
 
 # ================================================
 # RUNTIME STAGE (uses minimal Alpine image)
@@ -32,7 +32,7 @@ RUN apk --no-cache add ca-certificates tzdata
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S appgroup && \
-    adduser -u 1001 -S appuser -G appgroup
+  adduser -u 1001 -S appuser -G appgroup
 
 # Set working directory
 WORKDIR /app
