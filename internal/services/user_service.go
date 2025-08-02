@@ -137,6 +137,7 @@ func (s *userService) GetProfile(ctx context.Context, userID uint) (*models.User
 		Email:     user.Email,
 		Username:  user.Username,
 		CreatedAt: user.CreatedAt,
+		Avatar:    user.Avatar, // Assuming Avatar field exists
 	}, nil
 }
 

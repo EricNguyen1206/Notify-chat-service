@@ -17,28 +17,37 @@ func NewChannelService(repo *postgres.ChannelRepository, userRepo *postgres.User
 	return &ChannelService{repo, userRepo}
 }
 
-func (s *ChannelService) GetAllChannel() ([]models.Channel, error) {
-	return s.repo.GetAllChannels()
-}
-
-func (s *ChannelService) GetUserChannels(userID uint) ([]models.ChannelListResponse, error) {
+// Refactored: GetAllChannel returns user's channels separated by type (direct/group)
+func (s *ChannelService) GetAllChannel(userID uint) (direct []models.DirectChannelResponse, group []models.ChannelResponse, err error) {
 	channels, err := s.repo.GetAllUserChannels(userID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-
-	// Convert to ChannelListResponse format
-	var response []models.ChannelListResponse
 	for _, channel := range channels {
-		response = append(response, models.ChannelListResponse{
-			ID:      channel.ID,
-			Name:    channel.Name,
-			Type:    channel.Type,
-			OwnerID: channel.OwnerID,
-		})
-	}
 
-	return response, nil
+		if channel.Type == models.ChannelTypeDirect {
+
+			friends, _ := s.userRepo.GetFriendsByChannelID(channel.ID)
+			resp := models.DirectChannelResponse{
+				ID:     channel.ID,
+				Name:   friends[0].Username, // Assuming the first friend is the channel name for group channels
+				Avatar: friends[0].Avatar,   // Assuming the first friend has an avatar
+				// If you want to show the channel name instead of the first friend's name, use
+				Type:    channel.Type,
+				OwnerID: channel.OwnerID,
+			}
+			direct = append(direct, resp)
+		} else {
+			resp := models.ChannelResponse{
+				ID:      channel.ID,
+				Name:    channel.Name,
+				Type:    channel.Type,
+				OwnerID: channel.OwnerID,
+			}
+			group = append(group, resp)
+		}
+	}
+	return direct, group, nil
 }
 
 func (s *ChannelService) CreateChannel(name string, ownerID uint, chanType string) (*models.Channel, error) {

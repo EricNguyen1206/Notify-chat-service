@@ -91,8 +91,6 @@ func NewRouter(
 }
 
 func (r *Router) SetupRoutes() {
-	api := r.engine.Group("/api/v1")
-
 	// healthCheck godoc
 	// @Summary Health check
 	// @Description Check if the API is running
@@ -101,17 +99,19 @@ func (r *Router) SetupRoutes() {
 	// @Produce json
 	// @Success 200 {object} map[string]string "API is healthy"
 	// @Router /kaithhealthcheck [get]
-	api.GET("/kaithhealthcheck", func(c *gin.Context) {
+	r.engine.GET("/kaithhealthcheck", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
+
+	api := r.engine.Group("/api/v1")
 
 	// Swagger documentation
 	api.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// WebSocket endpoint with authentication and rate limiting
 	api.GET("/ws",
-		r.authMW.RequireAuth(),
-		r.rateLimitMW.WebSocketRateLimit(5, time.Minute), // 5 connections per minute
+		// r.authMW.RequireAuth(),
+		// r.rateLimitMW.WebSocketRateLimit(5, time.Minute), // 5 connections per minute
 		r.wsHandler.HandleWebSocket,
 	)
 

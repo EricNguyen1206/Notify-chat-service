@@ -40,7 +40,7 @@ func main() {
 	slog.Info("Starting chat server")
 
 	// Initialize Redis connection
-	redisClient, err := database.NewRedisConnection(&cfg.Redis)
+	redisClient, err := database.NewRedisConnection(cfg.Redis.URI)
 	if err != nil {
 		slog.Error("Failed to connect to Redis", "error", err)
 		os.Exit(1)
@@ -48,13 +48,7 @@ func main() {
 	defer redisClient.Close()
 
 	// Initialize PostgreSQL connection
-	db, err := database.NewPostgresConnection(
-		cfg.Database.User,
-		cfg.Database.Password,
-		cfg.Database.Host,
-		cfg.Database.Port,
-		cfg.Database.DBName,
-	)
+	db, err := database.NewPostgresConnection(cfg.Database.URI)
 	if err != nil {
 		slog.Error("Failed to connect to PostgreSQL", "error", err)
 		os.Exit(1)

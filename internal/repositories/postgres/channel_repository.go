@@ -88,7 +88,7 @@ func (r *ChannelRepository) GetChatMessagesWithPagination(channelID uint, limit 
 	if limit <= 0 || limit > 100 {
 		limit = 20 // default limit
 	}
-	db = db.Order("created_at DESC").Limit(limit)
+	db = db.Order("created_at ASC").Limit(limit)
 	err := db.Find(&messages).Error
 	return messages, err
 }

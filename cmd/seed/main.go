@@ -24,19 +24,13 @@ func main() {
 	slog.Info("Starting database seeding...")
 
 	// Connect to database
-	db, err := database.NewPostgresConnection(
-		cfg.Database.User,
-		cfg.Database.Password,
-		cfg.Database.Host,
-		cfg.Database.Port,
-		cfg.Database.DBName,
-	)
+	db, err := database.NewPostgresConnection(cfg.Database.URI)
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
 
 	// Connect to Redis
-	redisClient, err := database.NewRedisConnection(&cfg.Redis)
+	redisClient, err := database.NewRedisConnection(cfg.Redis.URI)
 	if err != nil {
 		log.Fatal("Failed to connect to Redis:", err)
 	}
@@ -106,7 +100,7 @@ func main() {
 		slog.Warn("Could not find admin user for channel creation", "error", err)
 	} else {
 		// Create general channel
-		generalChannel, err := channelService.CreateChannel("general", admin.ID, "channel")
+		generalChannel, err := channelService.CreateChannel("general", admin.ID, "group")
 		if err != nil {
 			slog.Warn("General channel might already exist", "error", err)
 		} else {
@@ -116,7 +110,7 @@ func main() {
 		// Create multiple channels
 		channels := []string{"random", "development", "design", "testing"}
 		for _, channelName := range channels {
-			channel, err := channelService.CreateChannel(channelName, admin.ID, "channel")
+			channel, err := channelService.CreateChannel(channelName, admin.ID, "group")
 			if err != nil {
 				slog.Warn("Channel might already exist", "name", channelName, "error", err)
 			} else {
@@ -161,7 +155,7 @@ func seedSampleMessages(db *gorm.DB, userRepo *postgres.UserRepository, channelR
 		return err
 	}
 
-	// Sample channel messages
+	// Sample channel messages (using new model fields)
 	channelMessages := []models.Chat{
 		{
 			SenderID:  admin.ID,
@@ -186,14 +180,13 @@ func seedSampleMessages(db *gorm.DB, userRepo *postgres.UserRepository, channelR
 		},
 	}
 
-	// Create channel messages
 	for _, msg := range channelMessages {
 		if err := db.Create(&msg).Error; err != nil {
 			slog.Warn("Failed to create channel message", "error", err)
 		}
 	}
 
-	// Sample direct messages
+	// Sample direct messages (using new model fields)
 	directMessages := []models.Chat{
 		{
 			SenderID:   admin.ID,
@@ -212,7 +205,6 @@ func seedSampleMessages(db *gorm.DB, userRepo *postgres.UserRepository, channelR
 		},
 	}
 
-	// Create direct messages
 	for _, msg := range directMessages {
 		if err := db.Create(&msg).Error; err != nil {
 			slog.Warn("Failed to create direct message", "error", err)
