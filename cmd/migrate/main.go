@@ -21,13 +21,7 @@ func main() {
 	slog.Info("Starting database migration...")
 
 	// Connect to database
-	db, err := database.NewPostgresConnection(
-		cfg.Database.User,
-		cfg.Database.Password,
-		cfg.Database.Host,
-		cfg.Database.Port,
-		cfg.Database.DBName,
-	)
+	db, err := database.NewPostgresConnection(cfg.Database.URI)
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}

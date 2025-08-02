@@ -53,22 +53,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad request - invalid input data",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid credentials",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     }
                 }
@@ -108,15 +105,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad request - invalid input data",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     }
                 }
@@ -129,7 +124,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get all channels that the current user is a member of",
+                "description": "Get all channels that the current user is a member of, separated by type",
                 "consumes": [
                     "application/json"
                 ],
@@ -142,26 +137,21 @@ const docTemplate = `{
                 "summary": "Get user's channels",
                 "responses": {
                     "200": {
-                        "description": "List of user's channels",
+                        "description": "Object with direct and group channel lists",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/chat-service_internal_models.ChannelListResponse"
-                            }
+                            "$ref": "#/definitions/chat-service_internal_models.UserChannelsResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing token",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     }
                 }
@@ -207,22 +197,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad request - invalid input data",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing token",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     }
                 }
@@ -259,21 +246,19 @@ const docTemplate = `{
                     "200": {
                         "description": "Channel details retrieved successfully",
                         "schema": {
-                            "$ref": "#/definitions/chat-service_internal_models.ChannelResponse"
+                            "$ref": "#/definitions/chat-service_internal_models.ChannelDetailResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing token",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Channel not found",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     }
                 }
@@ -329,22 +314,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad request - invalid input data",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing token",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     }
                 }
@@ -388,15 +370,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized - invalid or missing token",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     }
                 }
@@ -442,15 +422,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized - invalid or missing token",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     }
                 }
@@ -506,22 +484,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad request - invalid input data",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing token",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     }
                 }
@@ -577,28 +552,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad request - invalid input data",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing token",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/chats/": {
+        "/messages/": {
             "post": {
                 "security": [
                     {
@@ -637,22 +609,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad request - invalid input data",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing token",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     }
                 }
@@ -665,7 +634,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get all chat messages for a specific channel",
+                "description": "Get all chat messages for a specific channel (paginated)",
                 "consumes": [
                     "application/json"
                 ],
@@ -683,37 +652,43 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Cursor for infinite scroll (timestamp)",
+                        "name": "before",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "List of chat messages",
+                        "description": "Paginated chat messages",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/chat-service_internal_models.ChatResponse"
-                            }
+                            "$ref": "#/definitions/chat-service_internal_models.PaginatedChatResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing token",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Channel not found",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     }
                 }
@@ -747,15 +722,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized - invalid or missing token",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     }
                 }
@@ -818,14 +791,15 @@ const docTemplate = `{
                     }
                 },
                 "name": {
+                    "description": "Name of the channel",
                     "type": "string"
                 },
                 "ownerId": {
-                    "description": "userid",
+                    "description": "ID of the channel owner",
                     "type": "integer"
                 },
                 "type": {
-                    "description": "Use consts",
+                    "description": "Type of channel, either 'direct' or 'group'",
                     "type": "string"
                 },
                 "updated_at": {
@@ -833,11 +807,21 @@ const docTemplate = `{
                 }
             }
         },
-        "chat-service_internal_models.ChannelListResponse": {
+        "chat-service_internal_models.ChannelDetailResponse": {
             "type": "object",
             "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
+                },
+                "members": {
+                    "description": "List of members in the channel",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/chat-service_internal_models.User"
+                    }
                 },
                 "name": {
                     "type": "string"
@@ -853,18 +837,8 @@ const docTemplate = `{
         "chat-service_internal_models.ChannelResponse": {
             "type": "object",
             "properties": {
-                "createdAt": {
-                    "type": "string"
-                },
                 "id": {
                     "type": "integer"
-                },
-                "members": {
-                    "description": "List of members in the channel",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/chat-service_internal_models.User"
-                    }
                 },
                 "name": {
                     "type": "string"
@@ -917,9 +891,11 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "createdAt": {
+                    "description": "timestamp of when the message was created",
                     "type": "string"
                 },
                 "fileName": {
+                    "description": "optional file name for media",
                     "type": "string"
                 },
                 "id": {
@@ -929,20 +905,63 @@ const docTemplate = `{
                     "description": "Relate to type message",
                     "type": "integer"
                 },
+                "senderAvatar": {
+                    "description": "url string for avatar",
+                    "type": "string"
+                },
                 "senderId": {
+                    "description": "ID of the user who sent the message",
                     "type": "integer"
                 },
                 "senderName": {
+                    "description": "Username of the sender",
                     "type": "string"
                 },
                 "text": {
+                    "description": "free text message",
                     "type": "string"
                 },
                 "type": {
-                    "description": "\"direct\" | \"channel\"",
+                    "description": "\"direct\" | \"group\"",
                     "type": "string"
                 },
                 "url": {
+                    "description": "optional URL for media",
+                    "type": "string"
+                }
+            }
+        },
+        "chat-service_internal_models.DirectChannelResponse": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "description": "Optional avatar for direct channels",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "ownerId": {
+                    "type": "integer"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "chat-service_internal_models.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "details": {
+                    "type": "string"
+                },
+                "message": {
                     "type": "string"
                 }
             }
@@ -973,6 +992,23 @@ const docTemplate = `{
                 }
             }
         },
+        "chat-service_internal_models.PaginatedChatResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/chat-service_internal_models.ChatResponse"
+                    }
+                },
+                "nextCursor": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "chat-service_internal_models.RegisterRequest": {
             "type": "object",
             "required": [
@@ -998,6 +1034,10 @@ const docTemplate = `{
         "chat-service_internal_models.User": {
             "type": "object",
             "properties": {
+                "avatar": {
+                    "description": "Avatar is optional and can be used to store a profile picture URL\nIt is not mandatory for the user to have an avatar.",
+                    "type": "string"
+                },
                 "channels": {
                     "type": "array",
                     "items": {
@@ -1011,6 +1051,7 @@ const docTemplate = `{
                     "$ref": "#/definitions/gorm.DeletedAt"
                 },
                 "email": {
+                    "description": "Unique email for the user",
                     "type": "string"
                 },
                 "id": {
@@ -1026,9 +1067,31 @@ const docTemplate = `{
                 }
             }
         },
+        "chat-service_internal_models.UserChannelsResponse": {
+            "type": "object",
+            "properties": {
+                "direct": {
+                    "description": "List of channels of type 'direct'",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/chat-service_internal_models.DirectChannelResponse"
+                    }
+                },
+                "group": {
+                    "description": "List of channels of type 'group'",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/chat-service_internal_models.ChannelResponse"
+                    }
+                }
+            }
+        },
         "chat-service_internal_models.UserResponse": {
             "type": "object",
             "properties": {
+                "avatar": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },

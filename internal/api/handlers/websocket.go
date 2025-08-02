@@ -26,7 +26,7 @@ func NewWSHandler(hub *websocket.Hub) *WSHandler {
 // @Failure 400 {object} map[string]interface{} "Bad request - missing or invalid userId parameter"
 // @Router /ws [get]
 func (h *WSHandler) HandleWebSocket(c *gin.Context) {
-	// Get userId from query parameters: /api/ws?userId=1
+	// Get userId from query parameters: /api/v1/ws?userId=1
 	userID := c.Query("userId")
 	if userID == "" {
 		log.Printf("🔴 WebSocket connection failed: missing userId parameter")

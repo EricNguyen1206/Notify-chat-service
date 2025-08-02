@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"chat-service/internal/config"
 	"log/slog"
 
 	"github.com/redis/go-redis/v9"
 )
+
 /*
 Redis Data Structures Used:
 
@@ -70,12 +70,12 @@ type RedisClient struct {
 	client *redis.Client
 }
 
-func NewRedisConnection(cfg *config.RedisConfig) (*RedisClient, error) {
-	if cfg.URI == "" {
-		return nil, fmt.Errorf("Redis URI is empty, check your configuration")
+func NewRedisConnection(redisURL string) (*RedisClient, error) {
+	if redisURL == "" {
+		return nil, fmt.Errorf("REDIS_URL environment variable is not set")
 	}
+	opt, err := redis.ParseURL(redisURL)
 
-	opt, err := redis.ParseURL(cfg.URI)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse Redis URL: %w", err)
 	}
@@ -83,7 +83,7 @@ func NewRedisConnection(cfg *config.RedisConfig) (*RedisClient, error) {
 	rdb := redis.NewClient(opt)
 
 	// Test connection
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
 
 	if err := rdb.Ping(ctx).Err(); err != nil {

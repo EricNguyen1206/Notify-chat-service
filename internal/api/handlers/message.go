@@ -14,6 +14,7 @@ import (
 
 type ChatHandler struct {
 	channelService *services.ChannelService
+	userService    services.UserService
 	chatRepo       *postgres.ChatRepository
 	hub            *websocket.Hub
 }
@@ -24,16 +25,19 @@ func NewChatHandler(channelService *services.ChannelService, chatRepo *postgres.
 
 // GetChannelMessages godoc
 // @Summary Get chat messages in a channel
-// @Description Get all chat messages for a specific channel
+// @Description Get all chat messages for a specific channel (paginated)
 // @Tags chats
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param id path int true "Channel ID"
-// @Success 200 {array} models.ChatResponse "List of chat messages"
-// @Failure 401 {object} map[string]interface{} "Unauthorized - invalid or missing token"
-// @Failure 404 {object} map[string]interface{} "Channel not found"
-// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Param limit query int false "Page size"
+// @Param before query int false "Cursor for infinite scroll (timestamp)"
+// @Success 200 {object} models.PaginatedChatResponse "Paginated chat messages"
+// @Failure 401 {object} models.ErrorResponse "Unauthorized - invalid or missing token"
+// @Failure 404 {object} models.ErrorResponse "Channel not found"
+// @Failure 500 {object} models.ErrorResponse "Internal server error"
+// @OperationId getChannelMessages
 // @Router /messages/channel/{id} [get]
 func (h *ChatHandler) GetChannelMessages(c *gin.Context) {
 	channelID, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -58,10 +62,15 @@ func (h *ChatHandler) GetChannelMessages(c *gin.Context) {
 
 	messages, err := h.channelService.GetChatMessagesByChannelWithPagination(uint(channelID), limit, before)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get messages"})
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Code:    http.StatusInternalServerError,
+			Message: "Failed to get messages",
+			Details: err.Error(),
+		})
 		return
 	}
 	responses := make([]models.ChatResponse, 0, len(messages))
+	var nextCursor *int64
 	for _, m := range messages {
 		responses = append(responses, models.ChatResponse{
 			ID:         m.ID,
@@ -73,8 +82,15 @@ func (h *ChatHandler) GetChannelMessages(c *gin.Context) {
 			CreatedAt:  m.CreatedAt,
 			ChannelID:  &m.ChannelID,
 		})
+		unixTime := m.CreatedAt.Unix()
+		nextCursor = &unixTime // last message timestamp for infinite scroll
 	}
-	c.JSON(http.StatusOK, responses)
+	paginated := models.PaginatedChatResponse{
+		Items:      responses,
+		Total:      len(responses),
+		NextCursor: nextCursor,
+	}
+	c.JSON(http.StatusOK, paginated)
 }
 
 // SendMessage godoc
@@ -86,15 +102,20 @@ func (h *ChatHandler) GetChannelMessages(c *gin.Context) {
 // @Security BearerAuth
 // @Param request body models.ChatRequest true "Chat message data"
 // @Success 201 {object} models.ChatResponse "Chat message created"
-// @Failure 400 {object} map[string]interface{} "Bad request - invalid input data"
-// @Failure 401 {object} map[string]interface{} "Unauthorized - invalid or missing token"
-// @Failure 500 {object} map[string]interface{} "Internal server error"
-// @Router /chats/ [post]
+// @Failure 400 {object} models.ErrorResponse "Bad request - invalid input data"
+// @Failure 401 {object} models.ErrorResponse "Unauthorized - invalid or missing token"
+// @Failure 500 {object} models.ErrorResponse "Internal server error"
+// @OperationId sendChatMessage
+// @Router /messages/ [post]
 func (h *ChatHandler) SendMessage(c *gin.Context) {
 	userID := c.MustGet("user_id").(uint)
 	var req models.ChatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: "Invalid input data",
+			Details: err.Error(),
+		})
 		return
 	}
 	chat := &models.Chat{
@@ -105,7 +126,11 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		FileName:  req.FileName,
 	}
 	if err := h.chatRepo.Create(chat); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create chat message"})
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Code:    http.StatusInternalServerError,
+			Message: "Failed to create chat message",
+			Details: err.Error(),
+		})
 		return
 	}
 
@@ -113,15 +138,26 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 	// The hub will handle Redis publishing internally when WebSocket clients are connected
 
 	// Optionally preload sender for response
+	// Preload sender to get name and avatar
+	sender, err := h.userService.GetProfile(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Code:    http.StatusInternalServerError,
+			Message: "Failed to fetch sender info",
+			Details: err.Error(),
+		})
+		return
+	}
 	response := models.ChatResponse{
-		ID:         chat.ID,
-		SenderID:   chat.SenderID,
-		SenderName: "", // You may want to fetch sender name if needed
-		Text:       chat.Text,
-		URL:        chat.URL,
-		FileName:   chat.FileName,
-		CreatedAt:  chat.CreatedAt,
-		ChannelID:  &chat.ChannelID,
+		ID:           chat.ID,
+		SenderID:     chat.SenderID,
+		SenderName:   sender.Username,
+		SenderAvatar: sender.Avatar, // assuming Avatar field exists
+		Text:         chat.Text,
+		URL:          chat.URL,
+		FileName:     chat.FileName,
+		CreatedAt:    chat.CreatedAt,
+		ChannelID:    &chat.ChannelID,
 	}
 	c.JSON(http.StatusCreated, response)
 }

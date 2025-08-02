@@ -24,19 +24,13 @@ func main() {
 	slog.Info("Starting database seeding...")
 
 	// Connect to database
-	db, err := database.NewPostgresConnection(
-		cfg.Database.User,
-		cfg.Database.Password,
-		cfg.Database.Host,
-		cfg.Database.Port,
-		cfg.Database.DBName,
-	)
+	db, err := database.NewPostgresConnection(cfg.Database.URI)
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
 
 	// Connect to Redis
-	redisClient, err := database.NewRedisConnection(&cfg.Redis)
+	redisClient, err := database.NewRedisConnection(cfg.Redis.URI)
 	if err != nil {
 		log.Fatal("Failed to connect to Redis:", err)
 	}
@@ -106,7 +100,7 @@ func main() {
 		slog.Warn("Could not find admin user for channel creation", "error", err)
 	} else {
 		// Create general channel
-		generalChannel, err := channelService.CreateChannel("general", admin.ID, "channel")
+		generalChannel, err := channelService.CreateChannel("general", admin.ID, "group")
 		if err != nil {
 			slog.Warn("General channel might already exist", "error", err)
 		} else {
@@ -116,7 +110,7 @@ func main() {
 		// Create multiple channels
 		channels := []string{"random", "development", "design", "testing"}
 		for _, channelName := range channels {
-			channel, err := channelService.CreateChannel(channelName, admin.ID, "channel")
+			channel, err := channelService.CreateChannel(channelName, admin.ID, "group")
 			if err != nil {
 				slog.Warn("Channel might already exist", "name", channelName, "error", err)
 			} else {

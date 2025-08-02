@@ -7,6 +7,13 @@ import (
 	"gorm.io/gorm"
 )
 
+// PaginatedChatResponse is a reusable paginated response for chat messages
+type PaginatedChatResponse struct {
+	Items      []ChatResponse `json:"items"`
+	Total      int            `json:"total"`
+	NextCursor *int64         `json:"nextCursor,omitempty"`
+}
+
 // Validate checks that exactly one of ReceiverID or ChannelID is set for a Chat
 func (c *Chat) Validate() error {
 	if (c.ReceiverID == nil && c.ChannelID == 0) || (c.ReceiverID != nil && c.ChannelID != 0) {
@@ -31,7 +38,7 @@ type ChatType string
 
 const (
 	ChatTypeDirect  ChatType = "direct"
-	ChatTypeChannel ChatType = "channel"
+	ChatTypeChannel ChatType = "group"
 )
 
 /** --------------------ENTITIES-------------------- */
@@ -66,14 +73,15 @@ type ChatRequest struct {
 
 // Response
 type ChatResponse struct {
-	ID         uint      `json:"id"`
-	Type       string    `json:"type"` // "direct" | "channel"
-	SenderID   uint      `json:"senderId"`
-	SenderName string    `json:"senderName"`
-	Text       *string   `json:"text,omitempty"`
-	URL        *string   `json:"url,omitempty"`
-	FileName   *string   `json:"fileName,omitempty"`
-	CreatedAt  time.Time `json:"createdAt"`
+	ID           uint      `json:"id"`
+	Type         string    `json:"type"`                   // "direct" | "group"
+	SenderID     uint      `json:"senderId"`               // ID of the user who sent the message
+	SenderName   string    `json:"senderName"`             // Username of the sender
+	SenderAvatar string    `json:"senderAvatar,omitempty"` // url string for avatar
+	Text         *string   `json:"text,omitempty"`         // free text message
+	URL          *string   `json:"url,omitempty"`          // optional URL for media
+	FileName     *string   `json:"fileName,omitempty"`     // optional file name for media
+	CreatedAt    time.Time `json:"createdAt"`              // timestamp of when the message was created
 
 	// Relate to type message
 	ReceiverID *uint `json:"receiverId,omitempty"` // direct

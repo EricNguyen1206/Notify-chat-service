@@ -29,12 +29,7 @@ type ServerConfig struct {
 }
 
 type DatabaseConfig struct {
-	Host     string
-	Port     string
-	User     string
-	Password string
-	DBName   string
-	SSLMode  string
+	URI string
 }
 
 type RedisConfig struct {
@@ -83,12 +78,7 @@ func LoadConfig() (*Config, error) {
 		viper.SetDefault("REDIS_DIAL_TIMEOUT", 5*time.Second)
 		viper.SetDefault("REDIS_READ_TIMEOUT", 3*time.Second)
 		viper.SetDefault("REDIS_WRITE_TIMEOUT", 3*time.Second)
-		viper.SetDefault("POSTGRES_USER", "postgres")
-		viper.SetDefault("POSTGRES_PASSWORD", "password")
-		viper.SetDefault("POSTGRES_HOST", "localhost")
-		viper.SetDefault("POSTGRES_PORT", "5432")
-		viper.SetDefault("POSTGRES_DB", "postgres")
-
+		viper.SetDefault("POSTGRES_URL", "postgres://postgres:password@localhost:5432/postgres?sslmode=disable")
 		// Enable environment variable reading
 		viper.AutomaticEnv()
 
@@ -102,11 +92,7 @@ func LoadConfig() (*Config, error) {
 				IdleTimeout:  viper.GetDuration("NOTIFY_IDLE_TIMEOUT"),
 			},
 			Database: DatabaseConfig{
-				Host:     viper.GetString("POSTGRES_HOST"),
-				Port:     viper.GetString("POSTGRES_PORT"),
-				User:     viper.GetString("POSTGRES_USER"),
-				Password: viper.GetString("POSTGRES_PASSWORD"),
-				DBName:   viper.GetString("POSTGRES_DB"),
+				URI: viper.GetString("POSTGRES_URL"),
 			},
 			Redis: RedisConfig{
 				URI:          viper.GetString("REDIS_URL"),
@@ -128,8 +114,7 @@ func LoadConfig() (*Config, error) {
 			"server_host", ConfigInstance.Server.Host,
 			"server_port", ConfigInstance.Server.Port,
 			"redis_uri", ConfigInstance.Redis.URI,
-			"db_host", ConfigInstance.Database.Host,
-			"db_name", ConfigInstance.Database.DBName,
+			"db_uri", ConfigInstance.Database.URI,
 		)
 	})
 

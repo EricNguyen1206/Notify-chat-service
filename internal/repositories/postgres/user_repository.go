@@ -167,3 +167,15 @@ func (r *UserRepository) Delete(ctx context.Context, userId uint) error {
 
 	return nil
 }
+
+func (r *UserRepository) GetFriendsByChannelID(channelID uint) ([]models.User, error) {
+	var users []models.User
+	err := r.db.Table("users").
+		Joins("JOIN channel_members ON channel_members.user_id = users.id").
+		Where("channel_members.channel_id = ? AND users.deleted_at IS NULL", channelID).
+		Find(&users).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to get friends by channel ID: %w", err)
+	}
+	return users, nil
+}

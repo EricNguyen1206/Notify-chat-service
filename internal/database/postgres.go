@@ -14,15 +14,10 @@ import (
 	// "gorm.io/gorm/logger"
 )
 
-func NewPostgresConnection(user, password, host, port, dbname string) (*gorm.DB, error) {
-	// dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
-	// 	host, user, password, dbname, port)
-	dsn := fmt.Sprintf("postgresql://%s:%s@%s:%s/%s",
-		user, password, host, port, dbname)
-
-	log.Printf("✅ Database connection established successfully %s", dsn)
+func NewPostgresConnection(dburi string) (*gorm.DB, error) {
+	log.Printf("✅ Database connection established successfully %s", dburi)
 	// Configure GORM with even more strict settings for statement handling
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+	db, err := gorm.Open(postgres.Open(dburi), &gorm.Config{
 		DisableForeignKeyConstraintWhenMigrating: true,
 		PrepareStmt:                              false, // Explicitly disable prepared statements
 		SkipDefaultTransaction:                   true,  // Skip default transaction for better performance
