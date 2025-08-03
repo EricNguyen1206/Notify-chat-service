@@ -27,24 +27,28 @@ func (s *ChannelService) GetAllChannel(userID uint) (direct []models.DirectChann
 
 		if channel.Type == models.ChannelTypeDirect {
 
-			friends, _ := s.userRepo.GetFriendsByChannelID(channel.ID, userID)
+			friends, err := s.userRepo.GetFriendsByChannelID(channel.ID, userID)
+			if err != nil {
+				return nil, nil, err
+			}
+
 			var usrName string
 			var avatar string
-			if len(friends) > 0 {
-				if (friends[0].ID == userID) && (len(friends) > 1) {
-					usrName = friends[1].Username // If the user is the first friend,
-					avatar = friends[1].Avatar    // use the second friend's name and avatar
-				} else {
-					usrName = friends[0].Username // Otherwise, use the first friend's name
-					avatar = friends[0].Avatar    // and avatar
-				}
-			} else if len(friends) == 1 {
-				// If there's only one friend, use their name
-				usrName = friends[0].Username // Assuming the first friend is the channel name
-				avatar = friends[0].Avatar    // Assuming the first friend has an avatar
-			} else {
+			if len(friends) == 0 {
 				usrName = "Unknown"
-				avatar = "" // No friends, set default values
+				avatar = ""
+			} else if len(friends) == 1 {
+				usrName = friends[0].Username
+				avatar = friends[0].Avatar
+			} else {
+				// Multiple friends - avoid showing current user as channel name
+				if friends[0].ID == userID {
+					usrName = friends[1].Username
+					avatar = friends[1].Avatar
+				} else {
+					usrName = friends[0].Username
+					avatar = friends[0].Avatar
+				}
 			}
 			resp := models.DirectChannelResponse{
 				ID:     channel.ID,
