@@ -3,7 +3,6 @@ package services
 import (
 	"chat-service/internal/models"
 	"chat-service/internal/repositories/postgres"
-	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -22,21 +21,21 @@ var (
 	ErrInvalidRequest     = errors.New("invalid request")
 )
 
-type UserService interface {
-	Register(ctx context.Context, req *models.RegisterRequest) (*models.UserResponse, error)
-	Login(ctx context.Context, req *models.LoginRequest) (*models.LoginResponse, error)
-	GetProfile(ctx context.Context, userID uint) (*models.UserResponse, error)
-	GetUserByEmail(ctx context.Context, email string) (*models.UserResponse, error)
-}
+// type UserService interface {
+// 	Register(req *models.RegisterRequest) (*models.UserResponse, error)
+// 	Login(req *models.LoginRequest) (*models.LoginResponse, error)
+// 	GetProfile(userID uint) (*models.UserResponse, error)
+// 	GetUserByEmail(email string) (*models.UserResponse, error)
+// }
 
-type userService struct {
+type UserService struct {
 	repo        *postgres.UserRepository
 	jwtSecret   string
 	redisClient *redis.Client
 }
 
-func NewUserService(repo *postgres.UserRepository, jwtSecret string, redisClient *redis.Client) UserService {
-	return &userService{
+func NewUserService(repo *postgres.UserRepository, jwtSecret string, redisClient *redis.Client) *UserService {
+	return &UserService{
 		repo:        repo,
 		jwtSecret:   jwtSecret,
 		redisClient: redisClient,
@@ -44,7 +43,7 @@ func NewUserService(repo *postgres.UserRepository, jwtSecret string, redisClient
 }
 
 // generateJWT creates a new JWT token for the user
-func (s *userService) generateJWT(user *models.User) (string, error) {
+func (s *UserService) generateJWT(user *models.User) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id":  user.ID,
 		"email":    user.Email,
@@ -57,7 +56,7 @@ func (s *userService) generateJWT(user *models.User) (string, error) {
 	return token.SignedString([]byte(s.jwtSecret))
 }
 
-func (s *userService) Register(ctx context.Context, req *models.RegisterRequest) (*models.UserResponse, error) {
+func (s *UserService) Register(req *models.RegisterRequest) (*models.UserResponse, error) {
 	// Validate request
 	if req.Email == "" || req.Password == "" || req.Username == "" {
 		log.Printf("❌ Registration failed: invalid request - email: %s, username: %s", req.Email, req.Username)
@@ -81,7 +80,7 @@ func (s *userService) Register(ctx context.Context, req *models.RegisterRequest)
 	}
 
 	// Create user in database (repository handles email uniqueness check)
-	if err := s.repo.Create(ctx, &user); err != nil {
+	if err := s.repo.Create(&user); err != nil {
 		if errors.Is(err, errors.New("email already exists")) {
 			log.Printf("❌ Registration failed: email already exists - %s", req.Email)
 			return nil, ErrUserAlreadyExists
@@ -100,8 +99,8 @@ func (s *userService) Register(ctx context.Context, req *models.RegisterRequest)
 	}, nil
 }
 
-func (s *userService) Login(ctx context.Context, req *models.LoginRequest) (*models.LoginResponse, error) {
-	user, err := s.repo.FindByEmail(ctx, req.Email)
+func (s *UserService) Login(req *models.LoginRequest) (*models.LoginResponse, error) {
+	user, err := s.repo.FindByEmail(req.Email)
 	if err != nil {
 		return nil, ErrInvalidCredentials
 	}
@@ -126,7 +125,7 @@ func (s *userService) Login(ctx context.Context, req *models.LoginRequest) (*mod
 	}, nil
 }
 
-func (s *userService) GetProfile(ctx context.Context, userID uint) (*models.UserResponse, error) {
+func (s *UserService) GetProfile(userID uint) (*models.UserResponse, error) {
 	user, err := s.repo.FindByID(userID)
 	if err != nil {
 		return nil, ErrUserNotFound
@@ -141,8 +140,8 @@ func (s *userService) GetProfile(ctx context.Context, userID uint) (*models.User
 	}, nil
 }
 
-func (s *userService) GetUserByEmail(ctx context.Context, email string) (*models.UserResponse, error) {
-	user, err := s.repo.FindByEmail(ctx, email)
+func (s *UserService) GetUserByEmail(email string) (*models.UserResponse, error) {
+	user, err := s.repo.FindByEmail(email)
 	if err != nil {
 		return nil, ErrUserNotFound
 	}

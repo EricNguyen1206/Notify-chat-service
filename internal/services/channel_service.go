@@ -27,11 +27,33 @@ func (s *ChannelService) GetAllChannel(userID uint) (direct []models.DirectChann
 
 		if channel.Type == models.ChannelTypeDirect {
 
-			friends, _ := s.userRepo.GetFriendsByChannelID(channel.ID)
+			friends, err := s.userRepo.GetFriendsByChannelID(channel.ID, userID)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			var usrName string
+			var avatar string
+			if len(friends) == 0 {
+				usrName = "Unknown"
+				avatar = ""
+			} else if len(friends) == 1 {
+				usrName = friends[0].Username
+				avatar = friends[0].Avatar
+			} else {
+				// Multiple friends - avoid showing current user as channel name
+				if friends[0].ID == userID {
+					usrName = friends[1].Username
+					avatar = friends[1].Avatar
+				} else {
+					usrName = friends[0].Username
+					avatar = friends[0].Avatar
+				}
+			}
 			resp := models.DirectChannelResponse{
 				ID:     channel.ID,
-				Name:   friends[0].Username, // Assuming the first friend is the channel name for group channels
-				Avatar: friends[0].Avatar,   // Assuming the first friend has an avatar
+				Name:   usrName, // Assuming the first friend is the channel name for group channels
+				Avatar: avatar,  // Assuming the first friend has an avatar
 				// If you want to show the channel name instead of the first friend's name, use
 				Type:    channel.Type,
 				OwnerID: channel.OwnerID,
@@ -211,6 +233,6 @@ func (s *ChannelService) GetChatMessagesByChannel(channelID uint) ([]models.Chat
 	return s.repo.GetChatMessages(channelID)
 }
 
-func (s *ChannelService) GetChatMessagesByChannelWithPagination(channelID uint, limit int, before *int64) ([]models.Chat, error) {
+func (s *ChannelService) GetChatMessagesByChannelWithPagination(channelID uint, limit int, before *int64) ([]models.ChatResponse, error) {
 	return s.repo.GetChatMessagesWithPagination(channelID, limit, before)
 }

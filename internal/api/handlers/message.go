@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -14,13 +15,13 @@ import (
 
 type ChatHandler struct {
 	channelService *services.ChannelService
-	userService    services.UserService
+	userService    *services.UserService
 	chatRepo       *postgres.ChatRepository
 	hub            *websocket.Hub
 }
 
-func NewChatHandler(channelService *services.ChannelService, chatRepo *postgres.ChatRepository, hub *websocket.Hub) *ChatHandler {
-	return &ChatHandler{channelService: channelService, chatRepo: chatRepo, hub: hub}
+func NewChatHandler(chanSvc *services.ChannelService, usrSvc *services.UserService, chatRepo *postgres.ChatRepository, hub *websocket.Hub) *ChatHandler {
+	return &ChatHandler{channelService: chanSvc, userService: usrSvc, chatRepo: chatRepo, hub: hub}
 }
 
 // GetChannelMessages godoc
@@ -73,14 +74,15 @@ func (h *ChatHandler) GetChannelMessages(c *gin.Context) {
 	var nextCursor *int64
 	for _, m := range messages {
 		responses = append(responses, models.ChatResponse{
-			ID:         m.ID,
-			SenderID:   m.SenderID,
-			SenderName: m.Sender.Username,
-			Text:       m.Text,
-			URL:        m.URL,
-			FileName:   m.FileName,
-			CreatedAt:  m.CreatedAt,
-			ChannelID:  &m.ChannelID,
+			ID:           m.ID,
+			SenderID:     m.SenderID,
+			SenderName:   m.SenderName,
+			SenderAvatar: m.SenderAvatar,
+			Text:         m.Text,
+			URL:          m.URL,
+			FileName:     m.FileName,
+			CreatedAt:    m.CreatedAt,
+			ChannelID:    m.ChannelID,
 		})
 		unixTime := m.CreatedAt.Unix()
 		nextCursor = &unixTime // last message timestamp for infinite scroll
@@ -120,11 +122,12 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 	}
 	chat := &models.Chat{
 		SenderID:  userID,
-		ChannelID: *req.ChannelID,
+		ChannelID: req.ChannelID,
 		Text:      req.Text,
 		URL:       req.URL,
 		FileName:  req.FileName,
 	}
+	slog.Debug("❤️ Creating chat message", "chat", chat)
 	if err := h.chatRepo.Create(chat); err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Code:    http.StatusInternalServerError,
@@ -139,7 +142,9 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 
 	// Optionally preload sender for response
 	// Preload sender to get name and avatar
-	sender, err := h.userService.GetProfile(c.Request.Context(), userID)
+
+	slog.Debug("❤️ Check", "user", userID)
+	sender, err := h.userService.GetProfile(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Code:    http.StatusInternalServerError,
