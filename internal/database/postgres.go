@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -15,7 +16,6 @@ import (
 )
 
 func NewPostgresConnection(dburi string) (*gorm.DB, error) {
-	log.Printf("✅ Database connection established successfully %s", dburi)
 	// Configure GORM with even more strict settings for statement handling
 	db, err := gorm.Open(postgres.Open(dburi), &gorm.Config{
 		DisableForeignKeyConstraintWhenMigrating: true,
@@ -23,6 +23,7 @@ func NewPostgresConnection(dburi string) (*gorm.DB, error) {
 		SkipDefaultTransaction:                   true,  // Skip default transaction for better performance
 		AllowGlobalUpdate:                        false, // Safety measure
 	})
+	slog.Info("PostgreSQL connection established successfully")
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %v", err)
 	}
@@ -52,66 +53,6 @@ func NewPostgresConnection(dburi string) (*gorm.DB, error) {
 		} else {
 			return nil, fmt.Errorf("failed to migrate database: %v", err)
 		}
-	}
-
-	// Add indexes
-	if err := addIndexes(db); err != nil {
-		return nil, fmt.Errorf("failed to add indexes: %v", err)
-	}
-
-	return db, nil
-}
-
-func NewPostgresConnectionWithURL(databaseURL string) (*gorm.DB, error) {
-	dsn := databaseURL
-
-	log.Printf("✅ Database connection established successfully %s", dsn)
-	// Configure GORM with even more strict settings for statement handling
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		DisableForeignKeyConstraintWhenMigrating: true,
-		PrepareStmt:                              false, // Explicitly disable prepared statements
-		SkipDefaultTransaction:                   true,  // Skip default transaction for better performance
-		AllowGlobalUpdate:                        false, // Safety measure
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %v", err)
-	}
-
-	// Get underlying *sql.DB
-	sqlDB, err := db.DB()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get database instance: %v", err)
-	}
-
-	// Additional cleanup of stale connections
-	if err := cleanupStaleConnections(sqlDB); err != nil {
-		log.Printf("TEST Warning: failed to cleanup stale connections: %v", err)
-	}
-
-	// Handle pre-migration for existing data
-	if err := handlePreMigration(db); err != nil {
-		log.Printf("Warning: Pre-migration failed: %v", err)
-	}
-
-	// Auto migrate the schema with proper error handling
-	// Skip problematic tables and migrate them separately
-	err = db.AutoMigrate(
-		&models.User{},
-		&models.Channel{},
-	)
-	if err != nil {
-		// Check if the error is about existing tables
-		if strings.Contains(err.Error(), "already exists") {
-			// If tables exist, we can continue as the schema is already set up
-			log.Println("Tables already exist, continuing with existing schema")
-		} else {
-			return nil, fmt.Errorf("failed to migrate database: %v", err)
-		}
-	}
-
-	// Handle Chat table separately
-	if err := ensureChatTableCompatibility(db); err != nil {
-		log.Printf("Warning: Failed to ensure chat table compatibility: %v", err)
 	}
 
 	// Add indexes

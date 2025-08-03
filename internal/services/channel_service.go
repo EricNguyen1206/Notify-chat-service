@@ -27,11 +27,29 @@ func (s *ChannelService) GetAllChannel(userID uint) (direct []models.DirectChann
 
 		if channel.Type == models.ChannelTypeDirect {
 
-			friends, _ := s.userRepo.GetFriendsByChannelID(channel.ID)
+			friends, _ := s.userRepo.GetFriendsByChannelID(channel.ID, userID)
+			var usrName string
+			var avatar string
+			if len(friends) > 0 {
+				if (friends[0].ID == userID) && (len(friends) > 1) {
+					usrName = friends[1].Username // If the user is the first friend,
+					avatar = friends[1].Avatar    // use the second friend's name and avatar
+				} else {
+					usrName = friends[0].Username // Otherwise, use the first friend's name
+					avatar = friends[0].Avatar    // and avatar
+				}
+			} else if len(friends) == 1 {
+				// If there's only one friend, use their name
+				usrName = friends[0].Username // Assuming the first friend is the channel name
+				avatar = friends[0].Avatar    // Assuming the first friend has an avatar
+			} else {
+				usrName = "Unknown"
+				avatar = "" // No friends, set default values
+			}
 			resp := models.DirectChannelResponse{
 				ID:     channel.ID,
-				Name:   friends[0].Username, // Assuming the first friend is the channel name for group channels
-				Avatar: friends[0].Avatar,   // Assuming the first friend has an avatar
+				Name:   usrName, // Assuming the first friend is the channel name for group channels
+				Avatar: avatar,  // Assuming the first friend has an avatar
 				// If you want to show the channel name instead of the first friend's name, use
 				Type:    channel.Type,
 				OwnerID: channel.OwnerID,
@@ -211,6 +229,6 @@ func (s *ChannelService) GetChatMessagesByChannel(channelID uint) ([]models.Chat
 	return s.repo.GetChatMessages(channelID)
 }
 
-func (s *ChannelService) GetChatMessagesByChannelWithPagination(channelID uint, limit int, before *int64) ([]models.Chat, error) {
+func (s *ChannelService) GetChatMessagesByChannelWithPagination(channelID uint, limit int, before *int64) ([]models.ChatResponse, error) {
 	return s.repo.GetChatMessagesWithPagination(channelID, limit, before)
 }

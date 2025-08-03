@@ -81,7 +81,7 @@ func NewRouter(
 		engine:         engine,
 		wsHandler:      wsHandler,
 		channelHandler: handlers.NewChannelHandler(channelService),
-		messageHandler: handlers.NewChatHandler(channelService, chatRepo, hub),
+		messageHandler: handlers.NewChatHandler(channelService, userService, chatRepo, hub),
 		userHandler:    handlers.NewUserHandler(userService, redisClient),
 		rateLimitMW:    rateLimitMW,
 		authMW:         authMW,

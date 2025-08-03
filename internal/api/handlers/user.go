@@ -10,11 +10,11 @@ import (
 )
 
 type UserHandler struct {
-	userService services.UserService
+	userService *services.UserService
 	redisClient *redis.Client
 }
 
-func NewUserHandler(userService services.UserService, redisClient *redis.Client) *UserHandler {
+func NewUserHandler(userService *services.UserService, redisClient *redis.Client) *UserHandler {
 	return &UserHandler{userService: userService, redisClient: redisClient}
 }
 
@@ -40,7 +40,7 @@ func (h *UserHandler) Register(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userService.Register(c.Request.Context(), &req)
+	user, err := h.userService.Register(&req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Code:    http.StatusInternalServerError,
@@ -76,7 +76,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	loginResponse, err := h.userService.Login(c.Request.Context(), &req)
+	loginResponse, err := h.userService.Login(&req)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 			Code:    http.StatusUnauthorized,
@@ -120,7 +120,7 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 		})
 		return
 	}
-	profile, err := h.userService.GetProfile(c.Request.Context(), userIDUint)
+	profile, err := h.userService.GetProfile(userIDUint)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Code:    http.StatusInternalServerError,

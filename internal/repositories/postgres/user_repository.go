@@ -2,8 +2,6 @@ package postgres
 
 import (
 	"chat-service/internal/models"
-	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -20,7 +18,7 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
+func (r *UserRepository) Create(user *models.User) error {
 	log.Printf("🔄 Repository: Starting user creation for email: %s", user.Email)
 
 	// Begin transaction
@@ -48,7 +46,7 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 	})
 }
 
-func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*models.User, error) {
+func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
 	var user models.User
 	err := r.db.Where("email = ? AND deleted_at IS NULL", email).First(&user).Error
 	if err != nil {
@@ -69,15 +67,15 @@ func (r *UserRepository) FindByID(id uint) (*models.User, error) {
 	return &user, nil
 }
 
-func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
+func (r *UserRepository) Update(user *models.User) error {
 	// Get raw database connection
 	sqlDB, err := r.db.DB()
 	if err != nil {
 		return fmt.Errorf("failed to get database connection: %w", err)
 	}
 
-	// Begin transaction
-	tx, err := sqlDB.BeginTx(ctx, &sql.TxOptions{})
+	// Begin transaction (without context)
+	tx, err := sqlDB.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -87,12 +85,12 @@ func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
 
 	// Update user using raw SQL
 	query := `
-        UPDATE users 
-        SET email = $1, username = $2, password = $3
-        WHERE id = $4 AND deleted_at IS NULL
-    `
+		UPDATE users 
+		SET email = $1, username = $2, password = $3
+		WHERE id = $4 AND deleted_at IS NULL
+	`
 
-	result, err := tx.ExecContext(ctx, query,
+	result, err := tx.Exec(query,
 		user.Email,
 		user.Username,
 		user.Password,
@@ -121,15 +119,15 @@ func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
 	return nil
 }
 
-func (r *UserRepository) Delete(ctx context.Context, userId uint) error {
+func (r *UserRepository) Delete(userId uint) error {
 	// Get raw database connection
 	sqlDB, err := r.db.DB()
 	if err != nil {
 		return fmt.Errorf("failed to get database connection: %w", err)
 	}
 
-	// Begin transaction
-	tx, err := sqlDB.BeginTx(ctx, &sql.TxOptions{})
+	// Begin transaction (without context)
+	tx, err := sqlDB.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -140,12 +138,12 @@ func (r *UserRepository) Delete(ctx context.Context, userId uint) error {
 	// In GORM soft delete just updates the deleted_at column
 	now := time.Now()
 	query := `
-        UPDATE users 
-        SET deleted_at = $1 
-        WHERE id = $2 AND deleted_at IS NULL
-    `
+		UPDATE users 
+		SET deleted_at = $1 
+		WHERE id = $2 AND deleted_at IS NULL
+	`
 
-	result, err := tx.ExecContext(ctx, query, now, userId)
+	result, err := tx.Exec(query, now, userId)
 	if err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
@@ -168,11 +166,11 @@ func (r *UserRepository) Delete(ctx context.Context, userId uint) error {
 	return nil
 }
 
-func (r *UserRepository) GetFriendsByChannelID(channelID uint) ([]models.User, error) {
+func (r *UserRepository) GetFriendsByChannelID(channelID uint, userId uint) ([]models.User, error) {
 	var users []models.User
 	err := r.db.Table("users").
 		Joins("JOIN channel_members ON channel_members.user_id = users.id").
-		Where("channel_members.channel_id = ? AND users.deleted_at IS NULL", channelID).
+		Where("users.id != ? AND channel_members.channel_id = ? AND users.deleted_at IS NULL", userId, channelID).
 		Find(&users).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to get friends by channel ID: %w", err)

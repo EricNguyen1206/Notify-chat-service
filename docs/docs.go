@@ -850,19 +850,16 @@ const docTemplate = `{
         "chat-service_internal_models.ChatRequest": {
             "type": "object",
             "required": [
+                "channelId",
                 "type"
             ],
             "properties": {
                 "channelId": {
-                    "description": "for channel",
+                    "description": "for channel, not null",
                     "type": "integer"
                 },
                 "fileName": {
                     "type": "string"
-                },
-                "receiverId": {
-                    "description": "for direct",
-                    "type": "integer"
                 },
                 "text": {
                     "type": "string"

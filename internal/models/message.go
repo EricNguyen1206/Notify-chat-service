@@ -63,12 +63,11 @@ type Chat struct {
 /** -------------------- DTOs -------------------- */
 // Request
 type ChatRequest struct {
-	Type       string  `json:"type" binding:"required,oneof=direct channel"`
-	ReceiverID *uint   `json:"receiverId,omitempty"` // for direct
-	ChannelID  *uint   `json:"channelId,omitempty"`  // for channel
-	Text       *string `json:"text,omitempty"`
-	URL        *string `json:"url,omitempty"`
-	FileName   *string `json:"fileName,omitempty"`
+	Type      string  `json:"type" binding:"required,oneof=direct channel"`
+	ChannelID uint    `json:"channelId" binding:"required"` // for channel, not null
+	Text      *string `json:"text,omitempty"`
+	URL       *string `json:"url,omitempty"`
+	FileName  *string `json:"fileName,omitempty"`
 }
 
 // Response

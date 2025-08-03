@@ -79,16 +79,22 @@ func (r *ChannelRepository) GetChatMessages(channelID uint) ([]models.Chat, erro
 }
 
 // GetChatMessagesWithPagination returns chat messages for a channel with pagination and time-based infinite scroll
-func (r *ChannelRepository) GetChatMessagesWithPagination(channelID uint, limit int, before *int64) ([]models.Chat, error) {
-	var messages []models.Chat
-	db := r.db.Where("channel_id = ?", channelID)
+func (r *ChannelRepository) GetChatMessagesWithPagination(channelID uint, limit int, before *int64) ([]models.ChatResponse, error) {
+	var chatResponses []models.ChatResponse
+	db := r.db.Table("chats").
+		Select(`chats.id, chats.text, chats.sender_id, users.username as sender_name, users.avatar as sender_avatar, chats.url, chats.file_name, chats.created_at`).
+		Joins("JOIN users ON users.id = chats.sender_id").
+		Where("chats.channel_id = ?", channelID)
 	if before != nil {
-		db = db.Where("created_at < to_timestamp(?)", *before)
+		db = db.Where("chats.created_at < to_timestamp(?)", *before)
 	}
 	if limit <= 0 || limit > 100 {
 		limit = 20 // default limit
 	}
-	db = db.Order("created_at ASC").Limit(limit)
-	err := db.Find(&messages).Error
-	return messages, err
+	db = db.Order("chats.created_at ASC").Limit(limit)
+	err := db.Scan(&chatResponses).Error
+	if err != nil {
+		return nil, err
+	}
+	return chatResponses, nil
 }
