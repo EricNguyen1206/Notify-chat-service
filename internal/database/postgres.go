@@ -23,7 +23,6 @@ func NewPostgresConnection(dburi string) (*gorm.DB, error) {
 		SkipDefaultTransaction:                   true,  // Skip default transaction for better performance
 		AllowGlobalUpdate:                        false, // Safety measure
 	})
-	slog.Info("PostgreSQL connection established successfully")
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %v", err)
 	}
