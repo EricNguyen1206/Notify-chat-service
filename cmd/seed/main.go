@@ -6,7 +6,6 @@ import (
 	"chat-service/internal/models"
 	"chat-service/internal/repositories/postgres"
 	"chat-service/internal/services"
-	"context"
 	"log"
 	"log/slog"
 
@@ -45,8 +44,6 @@ func main() {
 	// Initialize services
 	channelService := services.NewChannelService(channelRepo, userRepo)
 
-	ctx := context.Background()
-
 	// Seed initial users
 	slog.Info("Creating initial users...")
 
@@ -58,7 +55,7 @@ func main() {
 		Password: string(adminPassword),
 	}
 
-	if err := userRepo.Create(ctx, adminUser); err != nil {
+	if err := userRepo.Create(adminUser); err != nil {
 		slog.Warn("Admin user might already exist", "error", err)
 	} else {
 		slog.Info("Created admin user", "id", adminUser.ID)
@@ -84,7 +81,7 @@ func main() {
 			Password: string(hashedPassword),
 		}
 
-		if err := userRepo.Create(ctx, user); err != nil {
+		if err := userRepo.Create(user); err != nil {
 			slog.Warn("User might already exist", "username", userData.username, "error", err)
 		} else {
 			slog.Info("Created user", "username", userData.username, "id", user.ID)
@@ -95,7 +92,7 @@ func main() {
 	slog.Info("Creating initial channels...")
 
 	// Get admin user for channel creation
-	admin, err := userRepo.FindByEmail(ctx, "admin@notify.com")
+	admin, err := userRepo.FindByEmail("admin@notify.com")
 	if err != nil {
 		slog.Warn("Could not find admin user for channel creation", "error", err)
 	} else {
@@ -131,20 +128,19 @@ func main() {
 }
 
 func seedSampleMessages(db *gorm.DB, userRepo *postgres.UserRepository, channelRepo *postgres.ChannelRepository) error {
-	ctx := context.Background()
 
 	// Get users for messaging
-	admin, err := userRepo.FindByEmail(ctx, "admin@notify.com")
+	admin, err := userRepo.FindByEmail("admin@notify.com")
 	if err != nil {
 		return err
 	}
 
-	alice, err := userRepo.FindByEmail(ctx, "alice@notify.com")
+	alice, err := userRepo.FindByEmail("alice@notify.com")
 	if err != nil {
 		return err
 	}
 
-	bob, err := userRepo.FindByEmail(ctx, "bob@notify.com")
+	bob, err := userRepo.FindByEmail("bob@notify.com")
 	if err != nil {
 		return err
 	}
