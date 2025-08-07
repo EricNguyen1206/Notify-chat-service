@@ -1,9 +1,3 @@
-/*
-==============================================================================
-  Channel-Specific WebSocket Logic
-==============================================================================
-*/
-
 package websocket
 
 import (
@@ -12,6 +6,12 @@ import (
 	"fmt"
 	"time"
 )
+
+/*
+==============================================================================
+  Channel-Specific WebSocket Logic
+==============================================================================
+*/
 
 type ChannelManager struct {
 	hub          *Hub
@@ -57,6 +57,10 @@ func (cm *ChannelManager) BroadcastChannelEvent(ctx context.Context, channelID s
 	}
 
 	return cm.redisService.PublishChannelEvent(ctx, channelID, event)
+}
+
+func (cm *ChannelManager) BroadcastChannelMessage(ctx context.Context, userID, channelID string, message *Message) error {
+	return cm.redisService.PublishChannelMessage(ctx, channelID, message)
 }
 
 type ChannelInfo struct {

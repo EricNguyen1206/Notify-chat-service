@@ -108,14 +108,6 @@ func LoadConfig() (*Config, error) {
 				ExpirationTime: viper.GetDuration("NOTIFY_JWT_EXPIRE"),
 			},
 		}
-
-		// Log configuration for debugging
-		slog.Info("Configuration loaded",
-			"server_host", ConfigInstance.Server.Host,
-			"server_port", ConfigInstance.Server.Port,
-			"redis_uri", ConfigInstance.Redis.URI,
-			"db_uri", ConfigInstance.Database.URI,
-		)
 	})
 
 	return ConfigInstance, nil

@@ -24,39 +24,10 @@ func (s *ChannelService) GetAllChannel(userID uint) (direct []models.DirectChann
 		return nil, nil, err
 	}
 	for _, channel := range channels {
-
 		if channel.Type == models.ChannelTypeDirect {
-
-			friends, err := s.userRepo.GetFriendsByChannelID(channel.ID, userID)
+			resp, err := s.buildDirectChannelResponse(&channel, userID)
 			if err != nil {
 				return nil, nil, err
-			}
-
-			var usrName string
-			var avatar string
-			if len(friends) == 0 {
-				usrName = "Unknown"
-				avatar = ""
-			} else if len(friends) == 1 {
-				usrName = friends[0].Username
-				avatar = friends[0].Avatar
-			} else {
-				// Multiple friends - avoid showing current user as channel name
-				if friends[0].ID == userID {
-					usrName = friends[1].Username
-					avatar = friends[1].Avatar
-				} else {
-					usrName = friends[0].Username
-					avatar = friends[0].Avatar
-				}
-			}
-			resp := models.DirectChannelResponse{
-				ID:     channel.ID,
-				Name:   usrName, // Assuming the first friend is the channel name for group channels
-				Avatar: avatar,  // Assuming the first friend has an avatar
-				// If you want to show the channel name instead of the first friend's name, use
-				Type:    channel.Type,
-				OwnerID: channel.OwnerID,
 			}
 			direct = append(direct, resp)
 		} else {
@@ -70,6 +41,41 @@ func (s *ChannelService) GetAllChannel(userID uint) (direct []models.DirectChann
 		}
 	}
 	return direct, group, nil
+}
+
+// buildDirectChannelResponse is a helper to reduce cognitive complexity in GetAllChannel
+func (s *ChannelService) buildDirectChannelResponse(channel *models.Channel, userID uint) (models.DirectChannelResponse, error) {
+	friends, err := s.userRepo.GetFriendsByChannelID(channel.ID, userID)
+	if err != nil {
+		return models.DirectChannelResponse{}, err
+	}
+
+	var usrName string
+	var avatar string
+	if len(friends) == 0 {
+		usrName = "Unknown"
+		avatar = ""
+	} else if len(friends) == 1 {
+		usrName = friends[0].Username
+		avatar = friends[0].Avatar
+	} else {
+		// Multiple friends - avoid showing current user as channel name
+		if friends[0].ID == userID {
+			usrName = friends[1].Username
+			avatar = friends[1].Avatar
+		} else {
+			usrName = friends[0].Username
+			avatar = friends[0].Avatar
+		}
+	}
+	resp := models.DirectChannelResponse{
+		ID:      channel.ID,
+		Name:    usrName,
+		Avatar:  avatar,
+		Type:    channel.Type,
+		OwnerID: channel.OwnerID,
+	}
+	return resp, nil
 }
 
 func (s *ChannelService) CreateChannel(name string, ownerID uint, chanType string) (*models.Channel, error) {

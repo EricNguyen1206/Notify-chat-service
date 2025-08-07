@@ -63,8 +63,6 @@ type Chat struct {
 /** -------------------- DTOs -------------------- */
 // Request
 type ChatRequest struct {
-	Type string `json:"type" binding:"required,oneof=direct channel"`
-	// channel ID is required for group messages and direct messsages
 	ChannelID uint    `json:"channelId" binding:"required"`
 	Text      *string `json:"text,omitempty"`
 	URL       *string `json:"url,omitempty"`

@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"sync"
 	"time"
 
+	"chat-service/internal/models"
+	"chat-service/internal/repositories/postgres"
 	"chat-service/internal/services"
 
 	"github.com/redis/go-redis/v9"
@@ -45,6 +48,9 @@ type Hub struct {
 	// Redis service for PubSub
 	redisService *services.RedisService
 
+	// Chat repository for message storage
+	chatRepo *postgres.ChatRepository
+
 	// Redis PubSub connection
 	pubsub *redis.PubSub
 
@@ -56,7 +62,7 @@ type Hub struct {
 	mu sync.RWMutex
 }
 
-func NewHub(redisService *services.RedisService) *Hub {
+func NewHub(redisService *services.RedisService, chatRepo *postgres.ChatRepository) *Hub {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	hub := &Hub{
@@ -67,6 +73,7 @@ func NewHub(redisService *services.RedisService) *Hub {
 		unregister:     make(chan *Client),
 		handleMessage:  make(chan *ClientMessage),
 		redisService:   redisService,
+		chatRepo:       chatRepo,
 		ctx:            ctx,
 		cancel:         cancel,
 	}
@@ -115,8 +122,6 @@ func (h *Hub) registerClient(client *Client) {
 	}
 	h.userClients[client.userID][client] = true
 
-	slog.Info("Client registered", "clientID", client.id, "userID", client.userID)
-
 	// Set user online in Redis
 	if err := h.redisService.SetUserOnline(h.ctx, client.userID); err != nil {
 		slog.Error("Failed to set user online", "userID", client.userID, "error", err)
@@ -160,7 +165,6 @@ func (h *Hub) unregisterClient(client *Client) {
 		}
 
 		close(client.send)
-		slog.Info("Client unregistered", "clientID", client.id, "userID", client.userID)
 	}
 }
 
@@ -257,20 +261,22 @@ func (h *Hub) handleLeaveChannel(client *Client, message *Message) {
 }
 
 func (h *Hub) handleChannelMessage(client *Client, message *Message) {
-	var data ChannelMessageData
+	var data models.ChatRequest
 	if err := h.mapToStruct(message.Data, &data); err != nil {
 		client.sendError("INVALID_DATA", "Invalid message data")
 		return
 	}
+	slog.Info("Received channel message", "channelID", data.ChannelID, "userID", client.userID)
 
 	// Check if client is in channel
-	if !client.IsInChannel(data.ChannelID) {
+	channelIDStr := strconv.FormatUint(uint64(data.ChannelID), 10)
+	if !client.IsInChannel(channelIDStr) {
 		client.sendError("NOT_IN_CHANNEL", "You are not in this channel")
 		return
 	}
 
 	// Check rate limit
-	rateLimitKey := fmt.Sprintf("rate_limit:message:%s:%s", client.userID, data.ChannelID)
+	rateLimitKey := fmt.Sprintf("rate_limit:message:%s:%s", client.userID, channelIDStr)
 	allowed, err := h.redisService.CheckRateLimit(h.ctx, rateLimitKey, 10, time.Minute)
 	if err != nil {
 		slog.Error("Failed to check rate limit", "error", err)
@@ -283,28 +289,58 @@ func (h *Hub) handleChannelMessage(client *Client, message *Message) {
 		return
 	}
 
-	// Create message for broadcast
+	// Convert client.userID (string) to uint
+	senderIDUint, err := strconv.ParseUint(client.userID, 10, 64)
+	if err != nil {
+		slog.Error("Failed to convert userID to uint", "userID", client.userID, "error", err)
+		client.sendError("INVALID_USER_ID", "Invalid user ID")
+		return
+	}
+
+	// Save message to database
+	chat := &models.Chat{
+		SenderID:  uint(senderIDUint),
+		ChannelID: data.ChannelID,
+		Text:      data.Text,
+		URL:       data.URL,
+		FileName:  data.FileName,
+	}
+	slog.Debug("❤️ Creating chat message", "chat", chat)
+	if err := h.chatRepo.Create(chat); err != nil {
+		slog.Error("Failed to save chat message to DB", "userID", client.userID, "error", err)
+		client.sendError("ERROR", "Failed to create chat message")
+		return
+	}
+
+	// Preload sender data
+	chat, err = h.chatRepo.FindByID(chat.ID)
+	if err != nil {
+		slog.Error("Failed to preload chat sender data", "chatID", chat.ID, "error", err)
+		client.sendError("ERROR", "Failed to preload chat sender data")
+		return
+	}
+
+	// Prepare message for broadcast
+	chatData, err := h.structToMap(chat)
+	if err != nil {
+		slog.Error("Failed to convert chat to map", "error", err)
+		client.sendError("ERROR", "Failed to create chat message")
+		return
+	}
 	broadcastMessage := &Message{
 		ID:        message.ID,
 		Type:      MessageTypeChannelMessage,
 		UserID:    client.userID,
 		Timestamp: time.Now().Unix(),
-		Data: map[string]interface{}{
-			"channel_id": data.ChannelID,
-			"content":    data.Content,
-			"reply_to":   data.ReplyToID,
-		},
+		Data:      chatData,
 	}
 
 	// Publish to Redis for other server instances
-	if err := h.redisService.PublishChannelMessage(h.ctx, data.ChannelID, broadcastMessage); err != nil {
+	if err := h.redisService.PublishChannelMessage(h.ctx, channelIDStr, broadcastMessage); err != nil {
 		slog.Error("Failed to publish message to Redis", "error", err)
 		client.sendError("PUBLISH_FAILED", "Failed to send message")
 		return
 	}
-
-	// Broadcast to local clients
-	h.broadcastToChannel(data.ChannelID, broadcastMessage)
 }
 
 func (h *Hub) handleTyping(client *Client, message *Message) {
@@ -494,6 +530,19 @@ func (h *Hub) mapToStruct(data map[string]interface{}, dest interface{}) error {
 		return err
 	}
 	return json.Unmarshal(jsonBytes, dest)
+}
+
+// structToMap converts a struct to map[string]interface{}
+func (h *Hub) structToMap(obj interface{}) (map[string]interface{}, error) {
+	jsonBytes, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	var result map[string]interface{}
+	if err := json.Unmarshal(jsonBytes, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (h *Hub) canUserJoinChannel(userID, channelID string) (bool, error) {

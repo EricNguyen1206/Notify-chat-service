@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"log/slog"
 	"strings"
 	"time"
 
@@ -12,7 +11,6 @@ import (
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	// "gorm.io/gorm/logger"
 )
 
 func NewPostgresConnection(dburi string) (*gorm.DB, error) {
@@ -26,7 +24,6 @@ func NewPostgresConnection(dburi string) (*gorm.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %v", err)
 	}
-	slog.Info("PostgreSQL connection established successfully")
 
 	// Get underlying *sql.DB
 	sqlDB, err := db.DB()

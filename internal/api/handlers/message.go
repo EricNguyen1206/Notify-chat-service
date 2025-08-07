@@ -137,13 +137,8 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	// TODO: Implement WebSocket broadcasting for real-time messaging
-	// The hub will handle Redis publishing internally when WebSocket clients are connected
-
 	// Optionally preload sender for response
 	// Preload sender to get name and avatar
-
-	slog.Debug("❤️ Check", "user", userID)
 	sender, err := h.userService.GetProfile(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{

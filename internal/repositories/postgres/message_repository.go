@@ -29,7 +29,7 @@ func (r *ChatRepository) GetFriendMessages(userID, friendID uint) ([]*models.Cha
 
 func (r *ChatRepository) FindByID(id uint) (*models.Chat, error) {
 	var chat models.Chat
-	err := r.db.First(&chat, "id = ?", id).Error
+	err := r.db.Preload("Sender").First(&chat, "id = ?", id).Error
 	return &chat, err
 }
 
