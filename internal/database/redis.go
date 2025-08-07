@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"log/slog"
-
 	"github.com/redis/go-redis/v9"
 )
 
@@ -89,8 +87,6 @@ func NewRedisConnection(redisURL string) (*RedisClient, error) {
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
 	}
-
-	slog.Info("Redis connection established successfully")
 
 	return &RedisClient{
 		client: rdb,

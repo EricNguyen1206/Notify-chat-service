@@ -16,6 +16,7 @@ import (
 	"chat-service/internal/api/routes"
 	"chat-service/internal/config"
 	"chat-service/internal/database"
+	"chat-service/internal/repositories/postgres"
 	"chat-service/internal/services"
 	"chat-service/internal/websocket"
 	"context"
@@ -63,9 +64,14 @@ func main() {
 		slog.Error("Failed to set migration state", "error", err)
 	}
 
+	chatRepo := postgres.NewChatRepository(db)
+
 	// Initialize WebSocket hub
-	hub := websocket.NewHub(redisService)
+	hub := websocket.NewHub(redisService, chatRepo)
 	go hub.Run()
+
+	// // Initialize channel manager
+	// channelManager := websocket.NewChannelManager(hub, redisService)
 
 	// Initialize router with all dependencies
 	router := routes.NewRouter(
