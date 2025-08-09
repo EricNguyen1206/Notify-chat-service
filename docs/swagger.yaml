@@ -53,26 +53,6 @@ definitions:
       type:
         type: string
     type: object
-  chat-service_internal_models.ChatRequest:
-    properties:
-      channelId:
-        description: for channel, not null
-        type: integer
-      fileName:
-        type: string
-      text:
-        type: string
-      type:
-        enum:
-        - direct
-        - channel
-        type: string
-      url:
-        type: string
-    required:
-    - channelId
-    - type
-    type: object
   chat-service_internal_models.ChatResponse:
     properties:
       channelId:
@@ -597,42 +577,6 @@ paths:
       summary: Leave channel
       tags:
       - channels
-  /messages/:
-    post:
-      consumes:
-      - application/json
-      description: Create a new chat message (channel or direct)
-      parameters:
-      - description: Chat message data
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/chat-service_internal_models.ChatRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Chat message created
-          schema:
-            $ref: '#/definitions/chat-service_internal_models.ChatResponse'
-        "400":
-          description: Bad request - invalid input data
-          schema:
-            $ref: '#/definitions/chat-service_internal_models.ErrorResponse'
-        "401":
-          description: Unauthorized - invalid or missing token
-          schema:
-            $ref: '#/definitions/chat-service_internal_models.ErrorResponse'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/chat-service_internal_models.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Create a new chat message
-      tags:
-      - chats
   /messages/channel/{id}:
     get:
       consumes:
@@ -705,7 +649,90 @@ paths:
     get:
       consumes:
       - application/json
-      description: Establish a WebSocket connection for real-time messaging
+      description: |-
+        Establish a WebSocket connection for real-time messaging with typed message support.
+
+        ## Message Types
+        The WebSocket API uses typed messages with the following enum values:
+
+        ### Connection Events
+        - `connection.connect` - Connection established (server -> client)
+        - `connection.disconnect` - Connection closed (server -> client)
+        - `connection.ping` - Ping message (client -> server)
+        - `connection.pong` - Pong response (server -> client)
+
+        ### Channel Events
+        - `channel.join` - Join a channel (client -> server)
+        - `channel.leave` - Leave a channel (client -> server)
+        - `channel.message` - Send/receive channel message (bidirectional)
+        - `channel.typing` - Typing indicator (client -> server)
+        - `channel.stop_typing` - Stop typing indicator (client -> server)
+
+        ### Channel Member Events
+        - `channel.member.join` - Member joined channel (server -> client)
+        - `channel.member.leave` - Member left channel (server -> client)
+
+        ### User Events
+        - `user.status` - User status update (server -> client)
+        - `user.notification` - User notification (server -> client)
+
+        ### Error Events
+        - `error` - Error message (server -> client)
+
+        ## Message Format
+        All messages follow this JSON structure:
+        ```json
+        {
+        "id": "unique-message-id",
+        "type": "message-type-enum",
+        "data": { /* type-specific data */ },
+        "timestamp": 1234567890,
+        "user_id": "user-id"
+        }
+        ```
+
+        ## Example Messages
+
+        ### Join Channel
+        ```json
+        {
+        "id": "msg-123",
+        "type": "channel.join",
+        "data": { "channel_id": "channel-123" },
+        "timestamp": 1234567890,
+        "user_id": "user-456"
+        }
+        ```
+
+        ### Send Message
+        ```json
+        {
+        "id": "msg-456",
+        "type": "channel.message",
+        "data": {
+        "channel_id": "channel-123",
+        "text": "Hello world!",
+        "url": null,
+        "fileName": null
+        },
+        "timestamp": 1234567890,
+        "user_id": "user-456"
+        }
+        ```
+
+        ### Error Response
+        ```json
+        {
+        "id": "error-789",
+        "type": "error",
+        "data": {
+        "code": "INVALID_MESSAGE",
+        "message": "Invalid message format"
+        },
+        "timestamp": 1234567890,
+        "user_id": "user-456"
+        }
+        ```
       parameters:
       - description: User ID for WebSocket connection
         in: query
@@ -722,7 +749,7 @@ paths:
           schema:
             additionalProperties: true
             type: object
-      summary: WebSocket connection
+      summary: WebSocket connection for real-time messaging
       tags:
       - websocket
 securityDefinitions:

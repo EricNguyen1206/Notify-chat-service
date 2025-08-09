@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -93,71 +92,4 @@ func (h *ChatHandler) GetChannelMessages(c *gin.Context) {
 		NextCursor: nextCursor,
 	}
 	c.JSON(http.StatusOK, paginated)
-}
-
-// SendMessage godoc
-// @Summary Create a new chat message
-// @Description Create a new chat message (channel or direct)
-// @Tags chats
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param request body models.ChatRequest true "Chat message data"
-// @Success 201 {object} models.ChatResponse "Chat message created"
-// @Failure 400 {object} models.ErrorResponse "Bad request - invalid input data"
-// @Failure 401 {object} models.ErrorResponse "Unauthorized - invalid or missing token"
-// @Failure 500 {object} models.ErrorResponse "Internal server error"
-// @OperationId sendChatMessage
-// @Router /messages/ [post]
-func (h *ChatHandler) SendMessage(c *gin.Context) {
-	userID := c.MustGet("user_id").(uint)
-	var req models.ChatRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Code:    http.StatusBadRequest,
-			Message: "Invalid input data",
-			Details: err.Error(),
-		})
-		return
-	}
-	chat := &models.Chat{
-		SenderID:  userID,
-		ChannelID: req.ChannelID,
-		Text:      req.Text,
-		URL:       req.URL,
-		FileName:  req.FileName,
-	}
-	slog.Debug("❤️ Creating chat message", "chat", chat)
-	if err := h.chatRepo.Create(chat); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Code:    http.StatusInternalServerError,
-			Message: "Failed to create chat message",
-			Details: err.Error(),
-		})
-		return
-	}
-
-	// Optionally preload sender for response
-	// Preload sender to get name and avatar
-	sender, err := h.userService.GetProfile(userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Code:    http.StatusInternalServerError,
-			Message: "Failed to fetch sender info",
-			Details: err.Error(),
-		})
-		return
-	}
-	response := models.ChatResponse{
-		ID:           chat.ID,
-		SenderID:     chat.SenderID,
-		SenderName:   sender.Username,
-		SenderAvatar: sender.Avatar, // assuming Avatar field exists
-		Text:         chat.Text,
-		URL:          chat.URL,
-		FileName:     chat.FileName,
-		CreatedAt:    chat.CreatedAt,
-		ChannelID:    &chat.ChannelID,
-	}
-	c.JSON(http.StatusCreated, response)
 }

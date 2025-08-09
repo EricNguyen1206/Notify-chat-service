@@ -566,63 +566,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/messages/": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Create a new chat message (channel or direct)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "chats"
-                ],
-                "summary": "Create a new chat message",
-                "parameters": [
-                    {
-                        "description": "Chat message data",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/chat-service_internal_models.ChatRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Chat message created",
-                        "schema": {
-                            "$ref": "#/definitions/chat-service_internal_models.ChatResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request - invalid input data",
-                        "schema": {
-                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized - invalid or missing token",
-                        "schema": {
-                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/messages/channel/{id}": {
             "get": {
                 "security": [
@@ -732,7 +675,7 @@ const docTemplate = `{
         },
         "/ws": {
             "get": {
-                "description": "Establish a WebSocket connection for real-time messaging",
+                "description": "Establish a WebSocket connection for real-time messaging with typed message support.\n\n## Message Types\nThe WebSocket API uses typed messages with the following enum values:\n\n### Connection Events\n- ` + "`" + `connection.connect` + "`" + ` - Connection established (server -\u003e client)\n- ` + "`" + `connection.disconnect` + "`" + ` - Connection closed (server -\u003e client)\n- ` + "`" + `connection.ping` + "`" + ` - Ping message (client -\u003e server)\n- ` + "`" + `connection.pong` + "`" + ` - Pong response (server -\u003e client)\n\n### Channel Events\n- ` + "`" + `channel.join` + "`" + ` - Join a channel (client -\u003e server)\n- ` + "`" + `channel.leave` + "`" + ` - Leave a channel (client -\u003e server)\n- ` + "`" + `channel.message` + "`" + ` - Send/receive channel message (bidirectional)\n- ` + "`" + `channel.typing` + "`" + ` - Typing indicator (client -\u003e server)\n- ` + "`" + `channel.stop_typing` + "`" + ` - Stop typing indicator (client -\u003e server)\n\n### Channel Member Events\n- ` + "`" + `channel.member.join` + "`" + ` - Member joined channel (server -\u003e client)\n- ` + "`" + `channel.member.leave` + "`" + ` - Member left channel (server -\u003e client)\n\n### User Events\n- ` + "`" + `user.status` + "`" + ` - User status update (server -\u003e client)\n- ` + "`" + `user.notification` + "`" + ` - User notification (server -\u003e client)\n\n### Error Events\n- ` + "`" + `error` + "`" + ` - Error message (server -\u003e client)\n\n## Message Format\nAll messages follow this JSON structure:\n` + "`" + `` + "`" + `` + "`" + `json\n{\n\"id\": \"unique-message-id\",\n\"type\": \"message-type-enum\",\n\"data\": { /* type-specific data */ },\n\"timestamp\": 1234567890,\n\"user_id\": \"user-id\"\n}\n` + "`" + `` + "`" + `` + "`" + `\n\n## Example Messages\n\n### Join Channel\n` + "`" + `` + "`" + `` + "`" + `json\n{\n\"id\": \"msg-123\",\n\"type\": \"channel.join\",\n\"data\": { \"channel_id\": \"channel-123\" },\n\"timestamp\": 1234567890,\n\"user_id\": \"user-456\"\n}\n` + "`" + `` + "`" + `` + "`" + `\n\n### Send Message\n` + "`" + `` + "`" + `` + "`" + `json\n{\n\"id\": \"msg-456\",\n\"type\": \"channel.message\",\n\"data\": {\n\"channel_id\": \"channel-123\",\n\"text\": \"Hello world!\",\n\"url\": null,\n\"fileName\": null\n},\n\"timestamp\": 1234567890,\n\"user_id\": \"user-456\"\n}\n` + "`" + `` + "`" + `` + "`" + `\n\n### Error Response\n` + "`" + `` + "`" + `` + "`" + `json\n{\n\"id\": \"error-789\",\n\"type\": \"error\",\n\"data\": {\n\"code\": \"INVALID_MESSAGE\",\n\"message\": \"Invalid message format\"\n},\n\"timestamp\": 1234567890,\n\"user_id\": \"user-456\"\n}\n` + "`" + `` + "`" + `` + "`" + `",
                 "consumes": [
                     "application/json"
                 ],
@@ -742,7 +685,7 @@ const docTemplate = `{
                 "tags": [
                     "websocket"
                 ],
-                "summary": "WebSocket connection",
+                "summary": "WebSocket connection for real-time messaging",
                 "parameters": [
                     {
                         "type": "string",
@@ -843,35 +786,6 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "chat-service_internal_models.ChatRequest": {
-            "type": "object",
-            "required": [
-                "channelId",
-                "type"
-            ],
-            "properties": {
-                "channelId": {
-                    "description": "for channel, not null",
-                    "type": "integer"
-                },
-                "fileName": {
-                    "type": "string"
-                },
-                "text": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string",
-                    "enum": [
-                        "direct",
-                        "channel"
-                    ]
-                },
-                "url": {
                     "type": "string"
                 }
             }

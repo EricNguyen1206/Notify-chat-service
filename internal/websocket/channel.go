@@ -48,14 +48,8 @@ func (cm *ChannelManager) GetChannelInfo(ctx context.Context, channelID string) 
 	}, nil
 }
 
-func (cm *ChannelManager) BroadcastChannelEvent(ctx context.Context, channelID string, eventType string, data map[string]interface{}) error {
-	event := &Message{
-		ID:        generateMessageID(),
-		Type:      eventType,
-		Timestamp: time.Now().Unix(),
-		Data:      data,
-	}
-
+func (cm *ChannelManager) BroadcastChannelEvent(ctx context.Context, channelID string, eventType MessageType, data map[string]interface{}) error {
+	event := NewMessage(generateMessageID(), eventType, "", data)
 	return cm.redisService.PublishChannelEvent(ctx, channelID, event)
 }
 

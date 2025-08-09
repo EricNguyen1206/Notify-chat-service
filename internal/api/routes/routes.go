@@ -44,6 +44,7 @@ type Router struct {
 	channelHandler *handlers.ChannelHandler
 	messageHandler *handlers.ChatHandler
 	userHandler    *handlers.UserHandler
+	authHandler    *handlers.AuthHandler
 	rateLimitMW    *middleware.RateLimitMiddleware
 	authMW         *middleware.AuthMiddleware
 }
@@ -83,6 +84,7 @@ func NewRouter(
 		channelHandler: handlers.NewChannelHandler(channelService),
 		messageHandler: handlers.NewChatHandler(channelService, userService, chatRepo, hub),
 		userHandler:    handlers.NewUserHandler(userService, redisClient),
+		authHandler:    handlers.NewAuthHandler(userService, redisClient),
 		rateLimitMW:    rateLimitMW,
 		authMW:         authMW,
 	}
@@ -146,7 +148,6 @@ func (r *Router) SetupRoutes() {
 		messages.Use(r.rateLimitMW.RateLimit(200, time.Minute)) // 200 requests per minute
 		{
 			messages.GET("/channel/:id", r.messageHandler.GetChannelMessages)
-			messages.POST("/", r.messageHandler.SendMessage)
 			// messages.PUT("/:id", r.messageHandler.UpdateMessage)
 			// messages.DELETE("/:id", r.messageHandler.DeleteMessage)
 		}
@@ -159,8 +160,8 @@ func (r *Router) SetupRoutes() {
 		authRoutes := public.Group("/auth")
 		authRoutes.Use(r.rateLimitMW.RateLimitIP(50, time.Minute)) // 50 requests per minute per IP
 		{
-			authRoutes.POST("/register", r.userHandler.Register)
-			authRoutes.POST("/login", r.userHandler.Login)
+			authRoutes.POST("/register", r.authHandler.Register)
+			authRoutes.POST("/login", r.authHandler.Login)
 		}
 	}
 }

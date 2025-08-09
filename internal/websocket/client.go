@@ -195,15 +195,7 @@ func (c *Client) SendMessage(message *Message) error {
 }
 
 func (c *Client) sendError(code, message string) {
-	errorMsg := &Message{
-		ID:        uuid.New().String(),
-		Type:      MessageTypeError,
-		Timestamp: time.Now().Unix(),
-		Data: map[string]interface{}{
-			"code":    code,
-			"message": message,
-		},
-	}
+	errorMsg := NewErrorMessage(uuid.New().String(), c.userID, code, message)
 	c.SendMessage(errorMsg)
 }
 

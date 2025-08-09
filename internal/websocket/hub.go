@@ -128,15 +128,12 @@ func (h *Hub) registerClient(client *Client) {
 	}
 
 	// Send connection success message
-	client.SendMessage(&Message{
-		ID:        fmt.Sprintf("conn_%d", time.Now().UnixNano()),
-		Type:      MessageTypeConnect,
-		Timestamp: time.Now().Unix(),
-		Data: map[string]interface{}{
-			"client_id": client.id,
-			"status":    "connected",
-		},
-	})
+	connMsg := NewConnectMessage(
+		fmt.Sprintf("conn_%d", time.Now().UnixNano()),
+		client.id,
+		client.userID,
+	)
+	client.SendMessage(connMsg)
 }
 
 func (h *Hub) unregisterClient(client *Client) {
@@ -173,6 +170,13 @@ func (h *Hub) handleClientMessage(clientMsg *ClientMessage) {
 	message := clientMsg.Message
 
 	slog.Debug("Handling client message", "type", message.Type, "userID", client.userID)
+
+	// Validate message before processing
+	if err := message.Validate(); err != nil {
+		slog.Error("Invalid message", "error", err, "userID", client.userID)
+		client.sendError("INVALID_MESSAGE", err.Error())
+		return
+	}
 
 	switch message.Type {
 	case MessageTypeJoinChannel:
@@ -222,15 +226,16 @@ func (h *Hub) handleJoinChannel(client *Client, message *Message) {
 	}
 
 	// Send success response
-	client.SendMessage(&Message{
-		ID:        fmt.Sprintf("join_%d", time.Now().UnixNano()),
-		Type:      MessageTypeJoinChannel,
-		Timestamp: time.Now().Unix(),
-		Data: map[string]interface{}{
+	joinResponse := NewMessage(
+		fmt.Sprintf("join_%d", time.Now().UnixNano()),
+		MessageTypeJoinChannel,
+		client.userID,
+		map[string]interface{}{
 			"channel_id": data.ChannelID,
 			"status":     "joined",
 		},
-	})
+	)
+	client.SendMessage(joinResponse)
 }
 
 func (h *Hub) handleLeaveChannel(client *Client, message *Message) {
@@ -249,15 +254,16 @@ func (h *Hub) handleLeaveChannel(client *Client, message *Message) {
 	}
 
 	// Send success response
-	client.SendMessage(&Message{
-		ID:        fmt.Sprintf("leave_%d", time.Now().UnixNano()),
-		Type:      MessageTypeLeaveChannel,
-		Timestamp: time.Now().Unix(),
-		Data: map[string]interface{}{
+	leaveResponse := NewMessage(
+		fmt.Sprintf("leave_%d", time.Now().UnixNano()),
+		MessageTypeLeaveChannel,
+		client.userID,
+		map[string]interface{}{
 			"channel_id": data.ChannelID,
 			"status":     "left",
 		},
-	})
+	)
+	client.SendMessage(leaveResponse)
 }
 
 func (h *Hub) handleChannelMessage(client *Client, message *Message) {
@@ -321,19 +327,7 @@ func (h *Hub) handleChannelMessage(client *Client, message *Message) {
 	}
 
 	// Prepare message for broadcast
-	chatData, err := h.structToMap(chat)
-	if err != nil {
-		slog.Error("Failed to convert chat to map", "error", err)
-		client.sendError("ERROR", "Failed to create chat message")
-		return
-	}
-	broadcastMessage := &Message{
-		ID:        message.ID,
-		Type:      MessageTypeChannelMessage,
-		UserID:    client.userID,
-		Timestamp: time.Now().Unix(),
-		Data:      chatData,
-	}
+	broadcastMessage := NewChannelMessage(message.ID, client.userID, chat)
 
 	// Publish to Redis for other server instances
 	if err := h.redisService.PublishChannelMessage(h.ctx, channelIDStr, broadcastMessage); err != nil {
@@ -356,30 +350,26 @@ func (h *Hub) handleTyping(client *Client, message *Message) {
 	}
 
 	// Create typing message
-	typingMessage := &Message{
-		ID:        fmt.Sprintf("typing_%d", time.Now().UnixNano()),
-		Type:      MessageTypeTyping,
-		UserID:    client.userID,
-		Timestamp: time.Now().Unix(),
-		Data: map[string]interface{}{
+	typingMessage := NewMessage(
+		fmt.Sprintf("typing_%d", time.Now().UnixNano()),
+		MessageTypeTyping,
+		client.userID,
+		map[string]interface{}{
 			"channel_id": data.ChannelID,
 			"is_typing":  data.IsTyping,
 		},
-	}
+	)
 
 	// Broadcast to channel (excluding sender)
 	h.broadcastToChannelExcept(data.ChannelID, typingMessage, client)
 }
 
 func (h *Hub) handlePing(client *Client, message *Message) {
-	pongMessage := &Message{
-		ID:        fmt.Sprintf("pong_%d", time.Now().UnixNano()),
-		Type:      MessageTypePong,
-		Timestamp: time.Now().Unix(),
-		Data: map[string]interface{}{
-			"ping_id": message.ID,
-		},
-	}
+	pongMessage := NewPongMessage(
+		fmt.Sprintf("pong_%d", time.Now().UnixNano()),
+		client.userID,
+		message.ID,
+	)
 	client.SendMessage(pongMessage)
 }
 
@@ -532,21 +522,10 @@ func (h *Hub) mapToStruct(data map[string]interface{}, dest interface{}) error {
 	return json.Unmarshal(jsonBytes, dest)
 }
 
-// structToMap converts a struct to map[string]interface{}
-func (h *Hub) structToMap(obj interface{}) (map[string]interface{}, error) {
-	jsonBytes, err := json.Marshal(obj)
-	if err != nil {
-		return nil, err
-	}
-	var result map[string]interface{}
-	if err := json.Unmarshal(jsonBytes, &result); err != nil {
-		return nil, err
-	}
-	return result, nil
-}
-
 func (h *Hub) canUserJoinChannel(userID, channelID string) (bool, error) {
 	// Implement your channel permission logic here
 	// For now, allow all users to join all channels
+	// TODO: Add proper permission checks based on userID and channelID
+	slog.Debug("Checking channel permissions", "userID", userID, "channelID", channelID)
 	return true, nil
 }
