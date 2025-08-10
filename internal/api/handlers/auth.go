@@ -35,17 +35,27 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Code:    http.StatusBadRequest,
 			Message: "Invalid input data",
-			Details: err.Error(),
+			Details: "Invalid input request",
 		})
 		return
 	}
 
 	user, err := h.userService.Register(&req)
 	if err != nil {
+		// Sentinel error check for known domain errors
+		if err.Error() == "email already exists" {
+			c.JSON(http.StatusConflict, models.ErrorResponse{
+				Code:    http.StatusConflict,
+				Message: "Email already exists",
+				Details: "",
+			})
+			return
+		}
+		// Generic error for other failures
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Code:    http.StatusInternalServerError,
 			Message: "Register failed",
-			Details: err.Error(),
+			Details: "An unexpected error occurred.",
 		})
 		return
 	}
@@ -71,7 +81,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Code:    http.StatusBadRequest,
 			Message: "Invalid input data",
-			Details: err.Error(),
+			Details: "Invalid input request",
 		})
 		return
 	}
