@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -43,6 +44,10 @@ type Hub struct {
 
 	// Mutex for thread safety
 	mu sync.RWMutex
+
+	// Connection state management
+	clientRegistrationTime map[*Client]time.Time // Track when clients were registered
+	cleanupTicker          *time.Ticker          // Periodic cleanup of stale connections
 }
 
 func NewHub(redisService *services.RedisService, chatRepo *postgres.ChatRepository) *Hub {
@@ -126,6 +131,18 @@ func (h *Hub) Stop() {
 func (h *Hub) JoinChannel(userID string, channelID string) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+
+	// Check if client is already closed (race condition protection)
+	if client.isClosed() {
+		slog.Warn("Attempted to register closed client", "clientID", client.id, "userID", client.userID)
+		return
+	}
+
+	slog.Info("Registering new WebSocket client", "clientID", client.id, "userID", client.userID)
+
+	// Check for existing clients for this user
+	existingClients := len(h.userClients[client.userID])
+	wasUserOnline := existingClients > 0
 
 	// Get or create channel
 	if h.channels[channelID] == nil {
