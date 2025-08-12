@@ -2,7 +2,11 @@ package handlers
 
 import (
 	"chat-service/internal/websocket"
-	"log"
+	"log/slog"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -13,6 +17,33 @@ type WSHandler struct {
 
 func NewWSHandler(hub *websocket.Hub) *WSHandler {
 	return &WSHandler{hub: hub}
+}
+
+// validateUserID validates and sanitizes the user ID parameter
+func (h *WSHandler) validateUserID(userID string) (string, error) {
+	if userID == "" {
+		return "", &ValidationError{Field: "userId", Message: "userId parameter is required"}
+	}
+
+	// Trim whitespace
+	userID = strings.TrimSpace(userID)
+
+	// Check if it's a valid number (assuming user IDs are numeric)
+	if _, err := strconv.ParseUint(userID, 10, 64); err != nil {
+		return "", &ValidationError{Field: "userId", Message: "userId must be a valid number"}
+	}
+
+	return userID, nil
+}
+
+// ValidationError represents a validation error
+type ValidationError struct {
+	Field   string `json:"field"`
+	Message string `json:"message"`
+}
+
+func (e *ValidationError) Error() string {
+	return e.Message
 }
 
 // HandleWebSocket godoc
@@ -108,16 +139,57 @@ func NewWSHandler(hub *websocket.Hub) *WSHandler {
 // @Failure 400 {object} map[string]interface{} "Bad request - missing or invalid userId parameter"
 // @Router /ws [get]
 func (h *WSHandler) HandleWebSocket(c *gin.Context) {
+	startTime := time.Now()
+	clientIP := c.ClientIP()
+	userAgent := c.GetHeader("User-Agent")
+
 	// Get userId from query parameters: /api/v1/ws?userId=1
 	userID := c.Query("userId")
-	if userID == "" {
-		log.Printf("🔴 WebSocket connection failed: missing userId parameter")
-		c.JSON(400, gin.H{"error": "userId parameter is required"})
+
+	// Validate user ID
+	validatedUserID, err := h.validateUserID(userID)
+	if err != nil {
+		slog.Error("WebSocket connection failed: invalid userId",
+			"userID", userID,
+			"clientIP", clientIP,
+			"userAgent", userAgent,
+			"error", err)
+
+		if validationErr, ok := err.(*ValidationError); ok {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": validationErr.Message,
+				"field": validationErr.Field,
+			})
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		}
 		return
 	}
 
-	log.Printf("🟢 New WebSocket connection request from User ID: %s", userID)
+	// Log connection attempt
+	slog.Info("WebSocket connection request",
+		"userID", validatedUserID,
+		"clientIP", clientIP,
+		"userAgent", userAgent)
+
+	// Check for required headers
+	if c.GetHeader("Connection") != "Upgrade" || c.GetHeader("Upgrade") != "websocket" {
+		slog.Error("WebSocket connection failed: missing required headers",
+			"userID", validatedUserID,
+			"clientIP", clientIP)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "WebSocket upgrade required"})
+		return
+	}
+
+	// Attempt WebSocket upgrade and client registration
+	defer func() {
+		duration := time.Since(startTime)
+		slog.Debug("WebSocket connection attempt completed",
+			"userID", validatedUserID,
+			"clientIP", clientIP,
+			"duration", duration)
+	}()
 
 	// Use the ServeWS function from websocket package for proper client creation and registration
-	websocket.ServeWS(h.hub, c.Writer, c.Request, userID)
+	websocket.ServeWS(h.hub, c.Writer, c.Request, validatedUserID)
 }

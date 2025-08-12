@@ -82,19 +82,35 @@ func (r *ChannelRepository) GetChatMessages(channelID uint) ([]models.Chat, erro
 func (r *ChannelRepository) GetChatMessagesWithPagination(channelID uint, limit int, before *int64) ([]models.ChatResponse, error) {
 	var chatResponses []models.ChatResponse
 	db := r.db.Table("chats").
-		Select(`chats.id, chats.text, chats.sender_id, users.username as sender_name, users.avatar as sender_avatar, chats.url, chats.file_name, chats.created_at`).
+		Select(`chats.id, chats.text, chats.sender_id, users.username as sender_name, users.avatar as sender_avatar, chats.url, chats.file_name, chats.created_at, chats.channel_id`).
 		Joins("JOIN users ON users.id = chats.sender_id").
 		Where("chats.channel_id = ?", channelID)
-	if before != nil {
-		db = db.Where("chats.created_at < to_timestamp(?)", *before)
-	}
+
 	if limit <= 0 || limit > 100 {
 		limit = 20 // default limit
 	}
-	db = db.Order("chats.created_at ASC").Limit(limit)
+
+	if before != nil {
+		// When "before" is provided, get messages before that timestamp in ascending order
+		db = db.Where("chats.created_at < to_timestamp(?)", *before).
+			Order("chats.created_at ASC").
+			Limit(limit)
+	} else {
+		// When no "before" parameter, get the latest messages in descending order, then reverse
+		db = db.Order("chats.created_at DESC").Limit(limit)
+	}
+
 	err := db.Scan(&chatResponses).Error
 	if err != nil {
 		return nil, err
 	}
+
+	// If no "before" parameter was provided, reverse the slice to maintain chronological order
+	if before == nil {
+		for i, j := 0, len(chatResponses)-1; i < j; i, j = i+1, j-1 {
+			chatResponses[i], chatResponses[j] = chatResponses[j], chatResponses[i]
+		}
+	}
+
 	return chatResponses, nil
 }

@@ -60,22 +60,28 @@ type Hub struct {
 
 	// Mutex for thread safety
 	mu sync.RWMutex
+
+	// Connection state management
+	clientRegistrationTime map[*Client]time.Time // Track when clients were registered
+	cleanupTicker          *time.Ticker          // Periodic cleanup of stale connections
 }
 
 func NewHub(redisService *services.RedisService, chatRepo *postgres.ChatRepository) *Hub {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	hub := &Hub{
-		clients:        make(map[*Client]bool),
-		userClients:    make(map[string]map[*Client]bool),
-		channelClients: make(map[string]map[*Client]bool),
-		register:       make(chan *Client),
-		unregister:     make(chan *Client),
-		handleMessage:  make(chan *ClientMessage),
-		redisService:   redisService,
-		chatRepo:       chatRepo,
-		ctx:            ctx,
-		cancel:         cancel,
+		clients:                make(map[*Client]bool),
+		userClients:            make(map[string]map[*Client]bool),
+		channelClients:         make(map[string]map[*Client]bool),
+		register:               make(chan *Client),
+		unregister:             make(chan *Client),
+		handleMessage:          make(chan *ClientMessage),
+		redisService:           redisService,
+		chatRepo:               chatRepo,
+		ctx:                    ctx,
+		cancel:                 cancel,
+		clientRegistrationTime: make(map[*Client]time.Time),
+		cleanupTicker:          time.NewTicker(30 * time.Second), // Cleanup every 30 seconds
 	}
 
 	return hub
@@ -84,6 +90,8 @@ func NewHub(redisService *services.RedisService, chatRepo *postgres.ChatReposito
 func (h *Hub) Run() {
 	// Subscribe to Redis channels
 	h.subscribeToRedis()
+
+	slog.Info("WebSocket hub started")
 
 	for {
 		select {
@@ -96,8 +104,12 @@ func (h *Hub) Run() {
 		case clientMsg := <-h.handleMessage:
 			h.handleClientMessage(clientMsg)
 
+		case <-h.cleanupTicker.C:
+			h.cleanupStaleConnections()
+
 		case <-h.ctx.Done():
 			slog.Info("WebSocket hub shutting down")
+			h.cleanupTicker.Stop()
 			return
 		}
 	}
@@ -114,7 +126,20 @@ func (h *Hub) registerClient(client *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
+	// Check if client is already closed (race condition protection)
+	if client.isClosed() {
+		slog.Warn("Attempted to register closed client", "clientID", client.id, "userID", client.userID)
+		return
+	}
+
+	slog.Info("Registering new WebSocket client", "clientID", client.id, "userID", client.userID)
+
+	// Check for existing clients for this user
+	existingClients := len(h.userClients[client.userID])
+	wasUserOnline := existingClients > 0
+
 	h.clients[client] = true
+	h.clientRegistrationTime[client] = time.Now()
 
 	// Add to user clients map
 	if h.userClients[client.userID] == nil {
@@ -122,9 +147,15 @@ func (h *Hub) registerClient(client *Client) {
 	}
 	h.userClients[client.userID][client] = true
 
-	// Set user online in Redis
-	if err := h.redisService.SetUserOnline(h.ctx, client.userID); err != nil {
-		slog.Error("Failed to set user online", "userID", client.userID, "error", err)
+	// Set user online in Redis only if this is the first client for the user
+	if !wasUserOnline {
+		if err := h.redisService.SetUserOnline(h.ctx, client.userID); err != nil {
+			slog.Error("Failed to set user online", "userID", client.userID, "error", err)
+		} else {
+			slog.Debug("User set online in Redis", "userID", client.userID)
+		}
+	} else {
+		slog.Debug("User already online, skipping Redis update", "userID", client.userID, "existingClients", existingClients)
 	}
 
 	// Send connection success message
@@ -133,7 +164,12 @@ func (h *Hub) registerClient(client *Client) {
 		client.id,
 		client.userID,
 	)
-	client.SendMessage(connMsg)
+
+	if err := client.SendMessage(connMsg); err != nil {
+		slog.Error("Failed to send connection message", "clientID", client.id, "userID", client.userID, "error", err)
+	}
+
+	slog.Debug("Client registered successfully", "clientID", client.id, "userID", client.userID, "totalClients", len(h.clients))
 }
 
 func (h *Hub) unregisterClient(client *Client) {
@@ -141,35 +177,79 @@ func (h *Hub) unregisterClient(client *Client) {
 	defer h.mu.Unlock()
 
 	if _, ok := h.clients[client]; ok {
+		slog.Debug("Unregistering client", "clientID", client.id, "userID", client.userID)
+
 		// Remove from clients map
 		delete(h.clients, client)
+		delete(h.clientRegistrationTime, client)
 
-		// Remove from user clients map
+		// Handle user clients map with careful Redis state management
+		shouldSetOffline := false
 		if userClients, exists := h.userClients[client.userID]; exists {
 			delete(userClients, client)
-			if len(userClients) == 0 {
+			remainingClients := len(userClients)
+
+			if remainingClients == 0 {
 				delete(h.userClients, client.userID)
-				// Set user offline if no more clients
-				if err := h.redisService.SetUserOffline(h.ctx, client.userID); err != nil {
-					slog.Error("Failed to set user offline", "userID", client.userID, "error", err)
-				}
+				shouldSetOffline = true
+				slog.Debug("Last client for user removed", "userID", client.userID)
+			} else {
+				slog.Debug("User still has active clients", "userID", client.userID, "remainingClients", remainingClients)
 			}
 		}
 
 		// Remove from all channel subscriptions
+		channelCount := len(client.channels)
 		for channelID := range client.channels {
 			h.removeClientFromChannel(client, channelID)
 		}
 
-		close(client.send)
+		if channelCount > 0 {
+			slog.Debug("Removed client from channels", "clientID", client.id, "userID", client.userID, "channelCount", channelCount)
+		}
+
+		// Close send channel safely
+		client.closeSendChannel()
+
+		// Set user offline in Redis only if no more clients remain
+		// Do this after all cleanup to avoid race conditions
+		if shouldSetOffline {
+			// Add a small delay to handle rapid reconnections
+			go func() {
+				time.Sleep(100 * time.Millisecond)
+
+				// Double-check that user is still offline after delay
+				h.mu.RLock()
+				stillOffline := len(h.userClients[client.userID]) == 0
+				h.mu.RUnlock()
+
+				if stillOffline {
+					if err := h.redisService.SetUserOffline(h.ctx, client.userID); err != nil {
+						slog.Error("Failed to set user offline", "userID", client.userID, "error", err)
+					} else {
+						slog.Debug("User set offline in Redis", "userID", client.userID)
+					}
+				} else {
+					slog.Debug("User reconnected during cleanup, skipping offline status", "userID", client.userID)
+				}
+			}()
+		}
+
+		// Wait for client goroutines to finish with timeout
+		go func() {
+			client.waitForGoroutines(10 * time.Second)
+			slog.Debug("Client cleanup completed", "clientID", client.id, "userID", client.userID)
+		}()
+
+		slog.Debug("Client unregistered successfully", "clientID", client.id, "userID", client.userID, "totalClients", len(h.clients))
+	} else {
+		slog.Debug("Client not found in registry", "clientID", client.id, "userID", client.userID)
 	}
 }
 
 func (h *Hub) handleClientMessage(clientMsg *ClientMessage) {
 	client := clientMsg.Client
 	message := clientMsg.Message
-
-	slog.Debug("Handling client message", "type", message.Type, "userID", client.userID)
 
 	// Validate message before processing
 	if err := message.Validate(); err != nil {
@@ -187,6 +267,8 @@ func (h *Hub) handleClientMessage(clientMsg *ClientMessage) {
 		h.handleChannelMessage(client, message)
 	case MessageTypeTyping:
 		h.handleTyping(client, message)
+	case MessageTypeStopTyping:
+		h.handleStopTyping(client, message)
 	case MessageTypePing:
 		h.handlePing(client, message)
 	default:
@@ -275,14 +357,13 @@ func (h *Hub) handleChannelMessage(client *Client, message *Message) {
 	slog.Info("Received channel message", "channelID", data.ChannelID, "userID", client.userID)
 
 	// Check if client is in channel
-	channelIDStr := strconv.FormatUint(uint64(data.ChannelID), 10)
-	if !client.IsInChannel(channelIDStr) {
+	if !client.IsInChannel(data.ChannelID) {
 		client.sendError("NOT_IN_CHANNEL", "You are not in this channel")
 		return
 	}
 
 	// Check rate limit
-	rateLimitKey := fmt.Sprintf("rate_limit:message:%s:%s", client.userID, channelIDStr)
+	rateLimitKey := fmt.Sprintf("rate_limit:message:%s:%s", client.userID, data.ChannelID)
 	allowed, err := h.redisService.CheckRateLimit(h.ctx, rateLimitKey, 10, time.Minute)
 	if err != nil {
 		slog.Error("Failed to check rate limit", "error", err)
@@ -303,10 +384,18 @@ func (h *Hub) handleChannelMessage(client *Client, message *Message) {
 		return
 	}
 
+	// Convert channelID (string) to uint
+	channelIDUint, err := strconv.ParseUint(data.ChannelID, 10, 64)
+	if err != nil {
+		slog.Error("Failed to convert channelID to uint", "channelID", data.ChannelID, "error", err)
+		client.sendError("INVALID_CHANNEL_ID", "Invalid channel ID")
+		return
+	}
+
 	// Save message to database
 	chat := &models.Chat{
 		SenderID:  uint(senderIDUint),
-		ChannelID: data.ChannelID,
+		ChannelID: uint(channelIDUint),
 		Text:      data.Text,
 		URL:       data.URL,
 		FileName:  data.FileName,
@@ -330,7 +419,7 @@ func (h *Hub) handleChannelMessage(client *Client, message *Message) {
 	broadcastMessage := NewChannelMessage(message.ID, client.userID, chat)
 
 	// Publish to Redis for other server instances
-	if err := h.redisService.PublishChannelMessage(h.ctx, channelIDStr, broadcastMessage); err != nil {
+	if err := h.redisService.PublishChannelMessage(h.ctx, data.ChannelID, broadcastMessage); err != nil {
 		slog.Error("Failed to publish message to Redis", "error", err)
 		client.sendError("PUBLISH_FAILED", "Failed to send message")
 		return
@@ -353,6 +442,33 @@ func (h *Hub) handleTyping(client *Client, message *Message) {
 	typingMessage := NewMessage(
 		fmt.Sprintf("typing_%d", time.Now().UnixNano()),
 		MessageTypeTyping,
+		client.userID,
+		map[string]interface{}{
+			"channel_id": data.ChannelID,
+			"is_typing":  data.IsTyping,
+		},
+	)
+
+	// Broadcast to channel (excluding sender)
+	h.broadcastToChannelExcept(data.ChannelID, typingMessage, client)
+}
+
+func (h *Hub) handleStopTyping(client *Client, message *Message) {
+	var data TypingData
+	if err := h.mapToStruct(message.Data, &data); err != nil {
+		client.sendError("INVALID_DATA", "Invalid typing data")
+		return
+	}
+
+	// Check if client is in channel
+	if !client.IsInChannel(data.ChannelID) {
+		return
+	}
+
+	// Create typing message
+	typingMessage := NewMessage(
+		fmt.Sprintf("typing_%d", time.Now().UnixNano()),
+		MessageTypeStopTyping,
 		client.userID,
 		map[string]interface{}{
 			"channel_id": data.ChannelID,
@@ -528,4 +644,67 @@ func (h *Hub) canUserJoinChannel(userID, channelID string) (bool, error) {
 	// TODO: Add proper permission checks based on userID and channelID
 	slog.Debug("Checking channel permissions", "userID", userID, "channelID", channelID)
 	return true, nil
+}
+
+// cleanupStaleConnections removes clients that have been inactive for too long
+func (h *Hub) cleanupStaleConnections() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	now := time.Now()
+	staleThreshold := 5 * time.Minute // Consider connections stale after 5 minutes
+	var staleClients []*Client
+
+	// Find stale clients
+	for client, registrationTime := range h.clientRegistrationTime {
+		if now.Sub(registrationTime) > staleThreshold {
+			// Check if client is actually closed or unresponsive
+			if client.isClosed() {
+				staleClients = append(staleClients, client)
+			}
+		}
+	}
+
+	// Clean up stale clients
+	if len(staleClients) > 0 {
+		slog.Info("Cleaning up stale connections", "count", len(staleClients))
+
+		for _, client := range staleClients {
+			// Remove from all maps
+			delete(h.clients, client)
+			delete(h.clientRegistrationTime, client)
+
+			// Remove from user clients map
+			if userClients, exists := h.userClients[client.userID]; exists {
+				delete(userClients, client)
+				if len(userClients) == 0 {
+					delete(h.userClients, client.userID)
+				}
+			}
+
+			// Remove from channel subscriptions
+			for channelID := range client.channels {
+				if channelClients, exists := h.channelClients[channelID]; exists {
+					delete(channelClients, client)
+					if len(channelClients) == 0 {
+						delete(h.channelClients, channelID)
+					}
+				}
+			}
+
+			slog.Debug("Cleaned up stale client", "clientID", client.id, "userID", client.userID)
+		}
+	}
+
+	// Log connection statistics
+	totalClients := len(h.clients)
+	totalUsers := len(h.userClients)
+	totalChannels := len(h.channelClients)
+
+	if totalClients > 0 {
+		slog.Debug("Connection statistics",
+			"totalClients", totalClients,
+			"totalUsers", totalUsers,
+			"totalChannels", totalChannels)
+	}
 }
