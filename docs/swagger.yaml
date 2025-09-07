@@ -88,6 +88,27 @@ definitions:
         description: optional URL for media
         type: string
     type: object
+  chat-service_internal_models.CreateChannelRequest:
+    properties:
+      name:
+        description: Optional for direct messages, required for group
+        type: string
+      type:
+        enum:
+        - direct
+        - group
+        type: string
+      userIds:
+        description: Minimum 2, maximum 4 users
+        items:
+          type: integer
+        maxItems: 4
+        minItems: 2
+        type: array
+    required:
+    - type
+    - userIds
+    type: object
   chat-service_internal_models.DirectChannelResponse:
     properties:
       avatar:
@@ -154,6 +175,24 @@ definitions:
     - email
     - password
     - username
+    type: object
+  chat-service_internal_models.UpdateProfileRequest:
+    properties:
+      avatar:
+        description: Optional avatar URL
+        type: string
+      current_password:
+        description: Required current password for verification
+        type: string
+      password:
+        minLength: 6
+        type: string
+      username:
+        maxLength: 50
+        minLength: 3
+        type: string
+    required:
+    - current_password
     type: object
   chat-service_internal_models.User:
     properties:
@@ -315,16 +354,14 @@ paths:
     post:
       consumes:
       - application/json
-      description: Create a new channel with the specified name
+      description: Create a new channel with the specified name and selected users
       parameters:
-      - description: Channel creation data
+      - description: Channel creation data with user selection
         in: body
         name: request
         required: true
         schema:
-          additionalProperties:
-            type: string
-          type: object
+          $ref: '#/definitions/chat-service_internal_models.CreateChannelRequest'
       produces:
       - application/json
       responses:
@@ -353,7 +390,8 @@ paths:
     delete:
       consumes:
       - application/json
-      description: Delete a channel (only channel owner can delete)
+      description: Delete a channel (only channel owner can delete). This will remove
+        all channel members and perform soft delete on the channel.
       parameters:
       - description: Channel ID
         in: path
@@ -369,8 +407,16 @@ paths:
             additionalProperties:
               type: string
             type: object
+        "400":
+          description: Bad request - channel not found or user is not owner
+          schema:
+            $ref: '#/definitions/chat-service_internal_models.ErrorResponse'
         "401":
           description: Unauthorized - invalid or missing token
+          schema:
+            $ref: '#/definitions/chat-service_internal_models.ErrorResponse'
+        "403":
+          description: Forbidden - only channel owner can delete channel
           schema:
             $ref: '#/definitions/chat-service_internal_models.ErrorResponse'
         "500":
@@ -645,113 +691,86 @@ paths:
       summary: Get user profile
       tags:
       - users
-  /ws:
+    put:
+      consumes:
+      - application/json
+      description: Update the current user's profile information (username, avatar,
+        password)
+      parameters:
+      - description: Profile update request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/chat-service_internal_models.UpdateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Profile updated successfully
+          schema:
+            $ref: '#/definitions/chat-service_internal_models.UserResponse'
+        "400":
+          description: Bad request - invalid input data
+          schema:
+            $ref: '#/definitions/chat-service_internal_models.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing token
+          schema:
+            $ref: '#/definitions/chat-service_internal_models.ErrorResponse'
+        "403":
+          description: Forbidden - current password is incorrect
+          schema:
+            $ref: '#/definitions/chat-service_internal_models.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/chat-service_internal_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update user profile
+      tags:
+      - users
+  /users/search:
     get:
       consumes:
       - application/json
-      description: |-
-        Establish a WebSocket connection for real-time messaging with typed message support.
-
-        ## Message Types
-        The WebSocket API uses typed messages with the following enum values:
-
-        ### Connection Events
-        - `connection.connect` - Connection established (server -> client)
-        - `connection.disconnect` - Connection closed (server -> client)
-        - `connection.ping` - Ping message (client -> server)
-        - `connection.pong` - Pong response (server -> client)
-
-        ### Channel Events
-        - `channel.join` - Join a channel (client -> server)
-        - `channel.leave` - Leave a channel (client -> server)
-        - `channel.message` - Send/receive channel message (bidirectional)
-        - `channel.typing` - Typing indicator (client -> server)
-        - `channel.stop_typing` - Stop typing indicator (client -> server)
-
-        ### Channel Member Events
-        - `channel.member.join` - Member joined channel (server -> client)
-        - `channel.member.leave` - Member left channel (server -> client)
-
-        ### User Events
-        - `user.status` - User status update (server -> client)
-        - `user.notification` - User notification (server -> client)
-
-        ### Error Events
-        - `error` - Error message (server -> client)
-
-        ## Message Format
-        All messages follow this JSON structure:
-        ```json
-        {
-        "id": "unique-message-id",
-        "type": "message-type-enum",
-        "data": { /* type-specific data */ },
-        "timestamp": 1234567890,
-        "user_id": "user-id"
-        }
-        ```
-
-        ## Example Messages
-
-        ### Join Channel
-        ```json
-        {
-        "id": "msg-123",
-        "type": "channel.join",
-        "data": { "channel_id": "channel-123" },
-        "timestamp": 1234567890,
-        "user_id": "user-456"
-        }
-        ```
-
-        ### Send Message
-        ```json
-        {
-        "id": "msg-456",
-        "type": "channel.message",
-        "data": {
-        "channel_id": "channel-123",
-        "text": "Hello world!",
-        "url": null,
-        "fileName": null
-        },
-        "timestamp": 1234567890,
-        "user_id": "user-456"
-        }
-        ```
-
-        ### Error Response
-        ```json
-        {
-        "id": "error-789",
-        "type": "error",
-        "data": {
-        "code": "INVALID_MESSAGE",
-        "message": "Invalid message format"
-        },
-        "timestamp": 1234567890,
-        "user_id": "user-456"
-        }
-        ```
+      description: Search for users by username (partial match for channel creation)
       parameters:
-      - description: User ID for WebSocket connection
+      - description: Username to search for
         in: query
-        name: userId
+        name: username
         required: true
         type: string
       produces:
       - application/json
       responses:
-        "101":
-          description: Switching Protocols - WebSocket connection established
-        "400":
-          description: Bad request - missing or invalid userId parameter
+        "200":
+          description: List of users found
           schema:
-            additionalProperties: true
-            type: object
-      summary: WebSocket connection for real-time messaging
+            items:
+              $ref: '#/definitions/chat-service_internal_models.UserResponse'
+            type: array
+        "400":
+          description: Bad request - invalid username
+          schema:
+            $ref: '#/definitions/chat-service_internal_models.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing token
+          schema:
+            $ref: '#/definitions/chat-service_internal_models.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/chat-service_internal_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Search users by username
       tags:
-      - websocket
+      - users
+schemes:
+- http
+- https
 securityDefinitions:
   BearerAuth:
     description: Type "Bearer" followed by a space and JWT token.
