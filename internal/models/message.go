@@ -63,7 +63,7 @@ type Chat struct {
 /** -------------------- DTOs -------------------- */
 // Request
 type ChatRequest struct {
-	ChannelID uint    `json:"channelId" binding:"required"`
+	ChannelID string  `json:"channel_id" binding:"required"`
 	Text      *string `json:"text,omitempty"`
 	URL       *string `json:"url,omitempty"`
 	FileName  *string `json:"fileName,omitempty"`

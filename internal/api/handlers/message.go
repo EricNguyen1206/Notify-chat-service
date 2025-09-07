@@ -72,8 +72,10 @@ func (h *ChatHandler) GetChannelMessages(c *gin.Context) {
 	responses := make([]models.ChatResponse, 0, len(messages))
 	var nextCursor *int64
 	for _, m := range messages {
+		channelIDPtr := uint(channelID)
 		responses = append(responses, models.ChatResponse{
 			ID:           m.ID,
+			Type:         string(models.ChatTypeChannel), // Set type for channel messages
 			SenderID:     m.SenderID,
 			SenderName:   m.SenderName,
 			SenderAvatar: m.SenderAvatar,
@@ -81,7 +83,7 @@ func (h *ChatHandler) GetChannelMessages(c *gin.Context) {
 			URL:          m.URL,
 			FileName:     m.FileName,
 			CreatedAt:    m.CreatedAt,
-			ChannelID:    m.ChannelID,
+			ChannelID:    &channelIDPtr, // Set channel ID pointer
 		})
 		unixTime := m.CreatedAt.Unix()
 		nextCursor = &unixTime // last message timestamp for infinite scroll

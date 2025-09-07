@@ -5,6 +5,7 @@ package main
 // @description     A RESTful API service for chat functionality
 // @host            localhost:8080
 // @BasePath        /api/v1
+// @schemes         http https
 
 // @securityDefinitions.apikey BearerAuth
 // @in header
@@ -12,7 +13,6 @@ package main
 // @description Type "Bearer" followed by a space and JWT token.
 
 import (
-	// _ "chat-service/docs" // Import swagger docs
 	"chat-service/internal/api/routes"
 	"chat-service/internal/config"
 	"chat-service/internal/database"
@@ -69,9 +69,6 @@ func main() {
 	// Initialize WebSocket hub
 	hub := websocket.NewHub(redisService, chatRepo)
 	go hub.Run()
-
-	// // Initialize channel manager
-	// channelManager := websocket.NewChannelManager(hub, redisService)
 
 	// Initialize router with all dependencies
 	router := routes.NewRouter(

@@ -158,7 +158,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Create a new channel with the specified name",
+                "description": "Create a new channel with the specified name and selected users",
                 "consumes": [
                     "application/json"
                 ],
@@ -171,15 +171,12 @@ const docTemplate = `{
                 "summary": "Create a new channel",
                 "parameters": [
                     {
-                        "description": "Channel creation data",
+                        "description": "Channel creation data with user selection",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/chat-service_internal_models.CreateChannelRequest"
                         }
                     }
                 ],
@@ -333,7 +330,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Delete a channel (only channel owner can delete)",
+                "description": "Delete a channel (only channel owner can delete). This will remove all channel members and perform soft delete on the channel.",
                 "consumes": [
                     "application/json"
                 ],
@@ -363,8 +360,20 @@ const docTemplate = `{
                             }
                         }
                     },
+                    "400": {
+                        "description": "Bad request - channel not found or user is not owner",
+                        "schema": {
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
+                        }
+                    },
                     "401": {
                         "description": "Unauthorized - invalid or missing token",
+                        "schema": {
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - only channel owner can delete channel",
                         "schema": {
                             "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
@@ -671,52 +680,14 @@ const docTemplate = `{
                         }
                     }
                 }
-            }
-        },
-        "/ws": {
-            "get": {
-             "get": {
--                "description": "Establish a WebSocket connection for real-time messaging with typed message support.\n…",
-+                "description": "Establish a WebSocket connection for real-time messaging with typed message support.\n…",
-                 "consumes": [
-                     "application/json"
-                 ],
-                 "produces": [
-                     "application/json"
-                 ],
-                 "tags": [
-                     "websocket"
-                 ],
-                 "summary": "WebSocket connection for real-time messaging",
--                "parameters": [
--                    {
--                        "type": "string",
--                        "description": "User ID for WebSocket connection",
--                        "name": "userId",
--                        "in": "query",
--                        "required": true
--                    }
--                ],
-+                "security": [
-+                    { "BearerAuth": [] }
-+                ],
-                 "responses": {
-                     "101": {
-                         "description": "Switching Protocols - WebSocket connection established"
-                     },
-+                    "401": {
-+                        "description": "Unauthorized - missing or invalid token",
-+                        "schema": { "$ref": "#/definitions/chat-service_internal_models.ErrorResponse" }
-+                    },
-                     "400": {
-                         "description": "Bad request - missing or invalid userId parameter",
-                         "schema": {
-                             "type": "object",
-                             "additionalProperties": true
-                         }
-                     }
-                 }
-             }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update the current user's profile information (username, avatar, password)",
                 "consumes": [
                     "application/json"
                 ],
@@ -724,27 +695,107 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "websocket"
+                    "users"
                 ],
-                "summary": "WebSocket connection for real-time messaging",
+                "summary": "Update user profile",
+                "parameters": [
+                    {
+                        "description": "Profile update request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/chat-service_internal_models.UpdateProfileRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Profile updated successfully",
+                        "schema": {
+                            "$ref": "#/definitions/chat-service_internal_models.UserResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - invalid input data",
+                        "schema": {
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - invalid or missing token",
+                        "schema": {
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - current password is incorrect",
+                        "schema": {
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/search": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Search for users by username (partial match for channel creation)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Search users by username",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "User ID for WebSocket connection",
-                        "name": "userId",
+                        "description": "Username to search for",
+                        "name": "username",
                         "in": "query",
                         "required": true
                     }
                 ],
                 "responses": {
-                    "101": {
-                        "description": "Switching Protocols - WebSocket connection established"
+                    "200": {
+                        "description": "List of users found",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/chat-service_internal_models.UserResponse"
+                            }
+                        }
                     },
                     "400": {
-                        "description": "Bad request - missing or invalid userId parameter",
+                        "description": "Bad request - invalid username",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - invalid or missing token",
+                        "schema": {
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/chat-service_internal_models.ErrorResponse"
                         }
                     }
                 }
@@ -879,6 +930,35 @@ const docTemplate = `{
                 }
             }
         },
+        "chat-service_internal_models.CreateChannelRequest": {
+            "type": "object",
+            "required": [
+                "type",
+                "userIds"
+            ],
+            "properties": {
+                "name": {
+                    "description": "Optional for direct messages, required for group",
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "direct",
+                        "group"
+                    ]
+                },
+                "userIds": {
+                    "description": "Minimum 2, maximum 4 users",
+                    "type": "array",
+                    "maxItems": 4,
+                    "minItems": 2,
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
         "chat-service_internal_models.DirectChannelResponse": {
             "type": "object",
             "properties": {
@@ -966,6 +1046,31 @@ const docTemplate = `{
             ],
             "properties": {
                 "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 6
+                },
+                "username": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 3
+                }
+            }
+        },
+        "chat-service_internal_models.UpdateProfileRequest": {
+            "type": "object",
+            "required": [
+                "current_password"
+            ],
+            "properties": {
+                "avatar": {
+                    "description": "Optional avatar URL",
+                    "type": "string"
+                },
+                "current_password": {
+                    "description": "Required current password for verification",
                     "type": "string"
                 },
                 "password": {
@@ -1081,7 +1186,7 @@ var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
 	Host:             "localhost:8080",
 	BasePath:         "/api/v1",
-	Schemes:          []string{},
+	Schemes:          []string{"http", "https"},
 	Title:            "Notify Chat Service API",
 	Description:      "A RESTful API service for chat functionality",
 	InfoInstanceName: "swagger",
