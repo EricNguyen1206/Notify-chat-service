@@ -58,23 +58,11 @@ func (c *Client) readPump(h *Hub) {
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPingHandler(nil)
 	c.conn.SetPongHandler(func(string) error {
-		if c.isClosed() {
-			return websocket.ErrCloseSent
-		}
 		c.conn.SetReadDeadline(time.Now().Add(pongWait))
 		return nil
 	})
 
-	slog.Debug("ReadPump started", "clientID", c.id, "userID", c.userID)
-
 	for {
-		select {
-		case <-c.ctx.Done():
-			slog.Debug("ReadPump context cancelled", "clientID", c.id, "userID", c.userID)
-			return
-		default:
-		}
-
 		_, messageBytes, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {

@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"strconv"
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -44,10 +43,6 @@ type Hub struct {
 
 	// Mutex for thread safety
 	mu sync.RWMutex
-
-	// Connection state management
-	clientRegistrationTime map[*Client]time.Time // Track when clients were registered
-	cleanupTicker          *time.Ticker          // Periodic cleanup of stale connections
 }
 
 func NewHub(redisService *services.RedisService, chatRepo *postgres.ChatRepository) *Hub {
