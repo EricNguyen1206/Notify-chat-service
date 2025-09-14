@@ -127,18 +127,6 @@ func (h *Hub) JoinChannel(userID string, channelID string) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	// Check if client is already closed (race condition protection)
-	if client.isClosed() {
-		slog.Warn("Attempted to register closed client", "clientID", client.id, "userID", client.userID)
-		return
-	}
-
-	slog.Info("Registering new WebSocket client", "clientID", client.id, "userID", client.userID)
-
-	// Check for existing clients for this user
-	existingClients := len(h.userClients[client.userID])
-	wasUserOnline := existingClients > 0
-
 	// Get or create channel
 	if h.channels[channelID] == nil {
 		h.channels[channelID] = make(map[string]*Client)

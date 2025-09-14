@@ -80,8 +80,6 @@ func (c *Client) writePump() {
 		_ = c.conn.Close()
 	}()
 
-	slog.Debug("WritePump started", "clientID", c.id, "userID", c.userID)
-
 	c.conn.SetWriteDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error {
 		c.conn.SetWriteDeadline(time.Now().Add(pongWait))
